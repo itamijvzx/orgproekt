@@ -1,0 +1,33 @@
+# Separate project: docker compose -p orgproekt-e2e -f compose.yml -f compose.e2e.yml ...
+services:
+  api:
+    environment: { LOCAL_DEMO_MODE: "false" }
+  worker:
+    environment: { LOCAL_DEMO_MODE: "false" }
+  scheduler:
+    environment: { LOCAL_DEMO_MODE: "false" }
+  migrate:
+    environment: { LOCAL_DEMO_MODE: "false" }
+  tools:
+    environment: { LOCAL_DEMO_MODE: "false" }
+    volumes: !override [./.local/e2e:/private]
+  caddy:
+    image: orgproekt-caddy:latest
+    ports: !override [127.0.0.1:8081:8080]
+  e2e:
+    logging:
+      driver: local
+      options: { max-size: "10m", max-file: "3", compress: "true" }
+    image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
+    profiles: [e2e]
+    working_dir: /app
+    network_mode: service:caddy
+    volumes:
+      - ./frontend:/app
+      - ./.local/e2e:/private
+      - ./docs/screenshots:/screenshots
+    environment:
+      CI: "1"
+      PLAYWRIGHT_BASE_URL: http://localhost:8080
+    command: [npm, run, test:e2e]
+    depends_on: [caddy]

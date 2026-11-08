@@ -1,0 +1,178 @@
+.access-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+.access-heading h2 {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.access-heading p {
+  margin-top: 6px;
+}
+.access-actions,
+.access-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.access-row-actions {
+  align-items: flex-start;
+}
+.access-actions {
+  margin: 12px 0;
+}
+.access-form {
+  display: grid;
+  gap: 16px;
+  margin: 18px 0;
+}
+.access-form label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.access-form > button {
+  justify-self: start;
+}
+.access-form textarea {
+  width: 100%;
+  min-height: 88px;
+  background: var(--input-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 10px;
+  color: inherit;
+}
+.access-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.access-check {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 10px;
+}
+.access-dialog {
+  max-width: 720px !important;
+  max-height: 90dvh;
+  overflow: auto;
+}
+.access-dialog input[readonly] {
+  font-family: monospace;
+}
+.access-person {
+  text-align: left;
+  color: var(--primary);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.access-operation {
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 18px;
+}
+.access-inline-form {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin: 10px 0;
+}
+.access-inline-form label {
+  display: grid;
+  gap: 8px;
+}
+.access-empty {
+  padding: 24px 0;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+}
+.access-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  height: auto !important;
+  gap: 4px;
+  margin-bottom: 20px;
+  justify-content: flex-start;
+}
+.access-tabs button {
+  white-space: normal !important;
+  min-height: 40px;
+}
+.access-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.access-workspace h3 {
+  font-size: 17px;
+  font-weight: 650;
+  margin: 18px 0 10px;
+}
+.access-workspace td {
+  vertical-align: top;
+}
+.access-workspace td p {
+  margin-top: 6px;
+}
+@media (max-width: 700px) {
+  .access-grants-table,
+  .access-grants-table tbody,
+  .access-grants-table tr {
+    display: block;
+    width: 100%;
+  }
+  .access-grants-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .access-grants-table td {
+    display: block;
+    width: 100%;
+    padding: 12px 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    border: 0;
+  }
+  .access-grants-table td::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted-foreground);
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .access-grants-table tr {
+    border-bottom: 1px solid var(--border);
+  }
+  .access-heading {
+    display: block;
+  }
+  .access-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .access-dialog {
+    width: calc(100vw - 24px) !important;
+  }
+  .access-actions button,
+  .access-row-actions button {
+    white-space: normal;
+    height: auto;
+    min-height: 40px;
+  }
+  .access-tabs {
+    width: 100%;
+  }
+  .access-tabs button {
+    flex: 1 1 auto;
+  }
+}

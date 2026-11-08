@@ -1,0 +1,14 @@
+# Add after compose.e2e.yml, only for its disposable synthetic project.
+services:
+  api:
+    environment: { LOCAL_DEMO_MODE: "true" }
+  worker:
+    environment: { LOCAL_DEMO_MODE: "true" }
+  scheduler:
+    environment: { LOCAL_DEMO_MODE: "true" }
+  migrate:
+    environment: { LOCAL_DEMO_MODE: "true" }
+  tools:
+    environment: { LOCAL_DEMO_MODE: "true" }
+  e2e:
+    environment: { ORGPROEKT_DEMO_E2E: "1" }

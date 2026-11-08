@@ -1,0 +1,121 @@
+name: orgproekt
+x-logging: &logging
+  driver: local
+  options:
+    max-size: '10m'
+    max-file: '3'
+    compress: 'true'
+x-app: &app
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  image: orgproekt-backend:local
+  environment: &app-env
+    APP_MODE: ${APP_MODE:-development}
+    LOCAL_DEMO_MODE: ${LOCAL_DEMO_MODE:-false}
+    APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+    DISPLAY_TIMEZONE: ${DISPLAY_TIMEZONE:-Asia/Almaty}
+    DATABASE_URL: postgresql+psycopg://orgproekt_app:${DB_APP_PASSWORD:?Run scripts/setup.ps1}@db/orgproekt
+    BROKER_URL: amqp://orgproekt:${RABBITMQ_PASSWORD:?Run scripts/setup.ps1}@rabbitmq:5672//
+    MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Run scripts/setup.ps1}
+    AUDIT_HMAC_KEY: ${AUDIT_HMAC_KEY:?Run scripts/setup.ps1}
+    GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    GEMINI_MODEL: ${GEMINI_MODEL:-}
+    GEMINI_ENABLED: ${GEMINI_ENABLED:-false}
+  restart: unless-stopped
+  logging: *logging
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  networks: [internal]
+  depends_on:
+    db: {condition: service_healthy}
+    rabbitmq: {condition: service_healthy}
+    migrate: {condition: service_completed_successfully}
+
+services:
+  db:
+    logging: *logging
+    image: pgvector/pgvector:pg17@sha256:ac08538c6f8b9904c33c8224c5e5706dbe760aca29db1d096972b4052c22a75d
+    environment:
+      POSTGRES_DB: orgproekt
+      POSTGRES_USER: orgproekt_owner
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?Run scripts/setup.ps1}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?Run scripts/setup.ps1}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres-init.sh:/docker-entrypoint-initdb.d/01-app.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U orgproekt_owner -d orgproekt']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [internal]
+  rabbitmq:
+    logging: *logging
+    image: rabbitmq:4-alpine@sha256:21577d148f4f7563a87d761862fa353f59348a094833ca8b1b1a46a8102dffce
+    hostname: orgproekt-rabbit
+    environment:
+      RABBITMQ_DEFAULT_USER: orgproekt
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Run scripts/setup.ps1}
+    volumes: [rabbit_data:/var/lib/rabbitmq]
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+    restart: unless-stopped
+    networks: [internal]
+  migrate:
+    <<: *app
+    command: [alembic, upgrade, head]
+    environment:
+      <<: *app-env
+      MIGRATION_DATABASE_URL: postgresql+psycopg://orgproekt_owner:${DB_ADMIN_PASSWORD}@db/orgproekt
+    restart: 'no'
+    depends_on:
+      db: {condition: service_healthy}
+  api:
+    <<: *app
+    healthcheck:
+      test: [CMD, python, -c, 'import urllib.request; urllib.request.urlopen("http://localhost:8000/api/health", timeout=3)']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  worker:
+    <<: *app
+    command: [celery, -A, app.worker.celery, worker, --loglevel=WARNING, --concurrency=2]
+    healthcheck:
+      test: [CMD, celery, -A, app.worker.celery, inspect, ping, --timeout=5]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+  scheduler:
+    <<: *app
+    command: [celery, -A, app.worker.celery, beat, --loglevel=WARNING, --schedule=/tmp/celerybeat-schedule]
+  caddy:
+    logging: *logging
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports: [127.0.0.1:8080:8080]
+    volumes: [caddy_data:/data, caddy_config:/config]
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [internal]
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+  tools:
+    <<: *app
+    profiles: [tools]
+    restart: 'no'
+    volumes: [./.local:/private]
+    command: [python, -m, app.cli, seed]
+
+volumes:
+  postgres_data:
+  rabbit_data:
+  caddy_data:
+  caddy_config:
+networks:
+  internal:

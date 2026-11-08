@@ -1,0 +1,35 @@
+# Сторонние материалы
+
+Для чтения PDF в текущем учебном образе используется pypdf 6.21.4 (BSD-3-Clause). Версия закреплена в `backend/uv.lock`.
+
+Для проверки WebAuthn используется серверная часть [python-fido2](https://github.com/Yubico/python-fido2) от Yubico. Версия 2.2.1 закреплена в `backend/uv.lock`. Условия основного кода — BSD-2-Clause. Пакет сохраняет также лицензии Apache-2.0 для включённых файлов HID и MPL-2.0 для списка публичных суффиксов. Тексты поставляются с wheel в каталоге `fido2-2.2.1.dist-info/licenses`.
+
+## Операторский backup/restore — 31.10.2026
+
+age **1.2.1-1+b5** из Debian trixie используется только в отдельном операторском образе, [официальный проект](https://github.com/FiloSottile/age), BSD-3-Clause; точный пакетный copyright сохранён в `references/AGE_COPYRIGHT.txt`. PostgreSQL client **17.11-0+deb13u1** создаёт custom dump и восстанавливает его; сервер/pgvector остаётся прежним закреплённым образом. Версии инструментов входят в зашифрованный manifest. Python/npm runtime-зависимости приложения не добавлялись. age используется готовым CLI, собственного алгоритма шифрования нет. Identity & Access Engineer применён к recovery/правам/негативным проверкам; это последовательная инженерная проверка, не независимый аудит.
+
+## Экспорт отчётов — 30.10.2026
+
+ReportLab **5.1.0** (BSD, точный текст из установленного пакета в `references/REPORTLAB_LICENSE.txt`) используется для PDF. python-docx **1.2.0** (MIT) теперь runtime-зависимость и создаёт DOCX отчётов, помимо прежних тестовых фикстур. Версии закреплены `backend/uv.lock`. Проверены первичные руководства: [ReportLab Paragraph](https://docs.reportlab.com/reportlab/userguide/ch6_paragraphs/), [python-docx Quickstart](https://python-docx.readthedocs.io/en/latest/user/quickstart.html).
+
+DejaVu Sans из Debian fonts-dejavu-core 2.37 используется для кириллицы и встраивается подмножеством в PDF; лицензия Bitstream Vera, изменения DejaVu — public domain. Точный copyright/лицензионный текст поставки сохранён в `references/DEJAVU_LICENSE.txt` и остаётся внутри образа. DOCX задаёт имя шрифта; конкретный редактор при его отсутствии может использовать замену. Сопоставление содержания и вёрстка проверены LibreOffice Writer 25.2.3 и Poppler в отдельном QA-контейнере; они не входят в рабочий образ сайта. Дополнительный pdf2image 1.17.0 используется только QA-образом.
+
+Agency Agents: https://github.com/msitarzewski/agency-agents, редакция `b37b5bb33b78f2c1d6567d98e25ca818e3259219`, получена 28.10.2026. Прочитаны UI Designer, UI Finish-Gate Reviewer, Identity & Access Engineer; оригиналы сохранены в `references/agency-agents`. Copyright (c) 2025 AgentLand Contributors. Полная MIT-лицензия находится рядом. Примеры OAuth/SSO из профиля не переносились: требования OrgProekt используют opaque sessions/TOTP.
+
+Для первой части этапа 2 полностью прочитан и применён RAG Pipeline Engineer из той же редакции: `references/agency-agents/engineering-rag-pipeline-engineer.md`, SHA-256 `d9b75715fc6eb5712054658727a6f9082d4be2579766d2b42a6060595caa9a96`. Применены структурное извлечение, точная связь фрагмента с источником, раздельный raw/normalized текст, scope перед выдачей и внешним вызовом, проверка цитат и эталоны. Embeddings/гибридный поиск не заявлены реализованными на основании одного профиля.
+
+Новые прямые Python-зависимости: pypdf 6.21.3 (BSD-3-Clause), defusedxml 0.7.1 (PSF), python-multipart 0.0.32 и google-genai 2.33.0 (Apache-2.0). python-docx 1.2.0 (MIT) используется только для генерации синтетических тестовых файлов. Версии закреплены `backend/uv.lock`; ссылки на документацию парсеров: https://pypdf.readthedocs.io/en/stable/user/extract-text.html и https://python-docx.readthedocs.io/en/latest/api/document.html. DOCX/PDF в `frontend/e2e/fixtures` созданы специально для проекта, содержат только вымышленные сведения и не копируют сторонние документы.
+
+shadcn/ui — MIT, исходники девяти компонентов из официального registry через CLI 4.23.0; лицензия `references/SHADCN_LICENSE.md` получена при редакции репозитория `96da9cc7f1aa10580a3741664e2a77c721206c00`. Magic UI Shimmer Button — MIT, https://magicui.design/docs/components/shimmer-button, исходник из https://magicui.design/r/shimmer-button.json; лицензия `references/MAGIC_UI_LICENSE.md` получена при редакции репозитория `efe76fc5755eca1142dd4f74c1d6f0ace2887e3c`. Используются бесплатные компоненты, Pro-материалы не скачивались. Реально используемые копии исходников находятся в `frontend/src/components/ui/`; registry — изменяемый источник, приведённые git-редакции фиксируют источник лицензий, не обещают идентичность registry git-дереву.
+
+React Flow (@xyflow/react) — MIT; Motion — MIT; Zustand — MIT; React — MIT; Tailwind CSS — MIT. Manrope Variable — SIL Open Font License 1.1, поставляется локально через @fontsource-variable/manrope; точная версия фиксируется lock-файлом. Lucide — ISC. Аудит уязвимостей зависимостей не является юридической проверкой лицензий всего транзитивного дерева; такая проверка остаётся перед публикацией.
+
+Файлы профилей — инструкции разработки, не runtime-зависимость. Их чтение не является независимым аудитом или сертификацией. Лицензия самого проекта не выбрана автоматически за владельца; решение перед публичной публикацией остаётся владельцу.
+
+## Локальная модель для поиска и сравнения — этап 2
+
+Используется [intfloat/multilingual-e5-small](https://huggingface.co/intfloat/multilingual-e5-small/tree/614241f622f53c4eeff9890bdc4f31cfecc418b3), авторы Liang Wang, Nan Yang, Xiaolong Huang, Linjun Yang, Rangan Majumder, Furu Wei; [технический отчёт](https://arxiv.org/abs/2402.05672). Лицензия MIT заявлена в метаданных официальной карточки модели и проверена 28.10.2026. В репозитории весов отдельного LICENSE нет; MIT-текст официального репозитория Microsoft UNILM/E5 сохранён в `references/UNILM_MIT_LICENSE.txt`, [редакция файла](https://github.com/microsoft/unilm/blob/0e31c7c09737df491e7ff74ded19614b884c52b4/LICENSE). Copyright (c) Microsoft Corporation. Это атрибуция опубликованной лицензии, не независимая юридическая проверка обучающих данных.
+
+Точная модель, ONNX qint8-файл, tokenizer, размеры и SHA-256 закреплены в `backend/embedding-model.json`. Скачивание происходит при сборке, runtime работает локально. Зависимости ONNX Runtime 1.31.1 (MIT), tokenizers 0.23.3 (Apache-2.0), pgvector-python 0.5.1 (MIT), NumPy 2.5.4 (BSD-3-Clause) закреплены uv.lock. Руководства: [pgvector Python](https://github.com/pgvector/pgvector-python), [ONNX quantization](https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html). Размерность 384, mean pooling/L2 и правила query/passage сверены с закреплённой карточкой модели.
+
+Продолжение этапа 2 применяет тот же RAG-профиль к чанкингу, реальному retrieval, оценке и контролируемой переиндексации; Identity & Access — к all-or-nothing комплектам, отзыву scope и записи worker; UI Designer/Finish-Gate — к спискам, сравнению, источникам и экранам 1440/390. Проверки последовательные, без заявления независимого аудита.

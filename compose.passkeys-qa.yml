@@ -1,0 +1,26 @@
+# Use with compose.yml + compose.test.yml and a disposable project / env-file.
+# The real Windows browser checks its normal TLS trust on a separate port.
+services:
+  api:
+    image: orgproekt-training-api:local
+    environment:
+      APP_ORIGIN: https://orgproekt-lab.localhost:8444
+      PASSKEYS_ENABLED: 'true'
+  migrate:
+    image: orgproekt-training-api:local
+  tools:
+    image: orgproekt-training-api:local
+    volumes: !override ['${PASSKEY_QA_DIR:?}/accounts:/private']
+  tests:
+    image: orgproekt-training-api:local
+  caddy:
+    image: orgproekt-training-web:local
+    user: '10001:10001'
+    ports: !override ['127.0.0.1:8444:8444']
+    volumes: !override
+      - ${PASSKEY_QA_DIR:?}/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${TRAINING_TLS_DIR:?}/server.pem:/run/lab/server.pem:ro
+      - ${TRAINING_TLS_DIR:?}/server.key:/run/lab/server.key:ro
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    tmpfs: [/data, /config]

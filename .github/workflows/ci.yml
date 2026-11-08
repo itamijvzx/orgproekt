@@ -1,0 +1,72 @@
+name: OrgProekt checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Scan source for secrets
+        run: |
+          node --test scripts/check-publication.test.mjs
+          node scripts/check-publication.mjs
+          docker run --rm -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f dir /repo --config /repo/.gitleaks.toml --redact --no-banner
+      - name: Create ephemeral environment
+        run: docker run --rm -v "$PWD:/repo" -w /repo python:3.13-slim@sha256:b3575dcf816cdacc5292df77a6e3e59b8941631078373a045efa2ac1e9c5c3b2 python scripts/setup_env.py
+      - name: Frontend lock, typecheck, build, behavior and dependency audit
+        run: docker run --rm -v "$PWD/frontend:/app" -w /app node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 sh -c 'npm ci && npm run build && npm test && npm audit --audit-level=high'
+      - name: Backend build and checks
+        run: |
+          docker compose build api
+          docker compose -f compose.yml -f compose.test.yml --profile tests run --rm tests ruff check --no-cache app tests migrations scripts ops
+          docker compose -f compose.yml -f compose.test.yml --profile tests run --rm tests ruff format --no-cache --check app tests migrations scripts ops
+          docker compose -f compose.yml -f compose.test.yml --profile tests run --rm tests
+          docker run --rm orgproekt-backend:local pip-audit --progress-spinner off
+          docker run --rm --network none -v "$PWD:/repo:ro" orgproekt-backend:local python /repo/scripts/verify_public_fixtures.py
+          docker run --rm --network none -v "$PWD:/repo:ro" -w /repo/backend orgproekt-backend:local ruff check --config pyproject.toml --no-cache ../scripts/verify_public_fixtures.py
+          docker run --rm --network none -v "$PWD:/repo:ro" -w /repo/backend orgproekt-backend:local ruff format --check --no-cache ../scripts/verify_public_fixtures.py
+      - name: Backup encryption and restore guard failure tests
+        run: |
+          docker build -f tools/backup/Dockerfile -t orgproekt-backup:local .
+          docker run --rm --network none --entrypoint python -v "$PWD/backend:/src:ro" -w /src orgproekt-backup:local -m pytest --noconftest -p no:cacheprovider -q tests/test_backup.py
+      - name: Verify generated API contracts
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo/backend orgproekt-backend:local python scripts/export_openapi.py --output ../frontend/openapi.json --check
+          docker run --rm -v "$PWD:/repo" -w /repo node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 sh -c 'npm ci --prefix tools/contracts && node tools/contracts/generate.mjs --check && npm audit --prefix tools/contracts --audit-level=high'
+      - name: Browser workflows with MFA and local demo
+        run: |
+          mkdir -p .local/e2e docs/screenshots
+          sudo chown 10001:10001 .local/e2e
+          sudo chmod 700 .local/e2e
+          for mode in mfa demo; do
+            args=(-p orgproekt-e2e -f compose.yml -f compose.e2e.yml)
+            specs=(e2e/access.spec.ts e2e/changes.spec.ts e2e/reports.spec.ts e2e/workflow.spec.ts)
+            if [ "$mode" = demo ]; then
+              args+=(-f compose.demo-e2e.yml)
+              specs+=(e2e/local-demo.spec.ts)
+            fi
+            docker compose "${args[@]}" down --volumes --remove-orphans
+            sudo rm -f .local/e2e/demo-accounts.json .local/e2e/test-factors.json
+            docker compose "${args[@]}" up -d --build --wait api worker scheduler caddy
+            docker compose "${args[@]}" --profile tools run --rm tools python -m app.cli seed
+            docker compose "${args[@]}" --profile tools run --rm tools python -m app.cli expand-demo
+            echo disposable-orgproekt-e2e | sudo tee .local/e2e/e2e-only.guard >/dev/null
+            sudo chown 10001:10001 .local/e2e/e2e-only.guard
+            docker compose "${args[@]}" --profile tools run --rm -e ORGPROEKT_E2E_FIXTURE=disposable-orgproekt-e2e tools python -m tests.setup_change_e2e
+            for spec in "${specs[@]}"; do
+              docker compose "${args[@]}" --profile tools run --rm --no-deps -e ORGPROEKT_E2E_FIXTURE=disposable-orgproekt-e2e tools python -m tests.reset_e2e_limits
+              docker compose "${args[@]}" --profile e2e run --rm --no-deps e2e npm run test:e2e -- "$spec"
+            done
+          done
+      - name: Stop ephemeral stacks
+        if: always()
+        run: |
+          docker compose -p orgproekt-e2e -f compose.yml -f compose.e2e.yml down --volumes --remove-orphans
+          docker compose -f compose.yml -f compose.test.yml down --volumes --remove-orphans

@@ -1,0 +1,17 @@
+title = "OrgProekt source scan"
+[extend]
+useDefault = true
+[allowlist]
+description = "Ignored local runtime material and third-party dependency caches, never published"
+paths = [
+  '''(^|/)\.local/''',
+  '''(^|/)backups/''',
+  '''(^|/)\.env$''',
+  '''(^|/)\.git/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)\.venv/''',
+  '''(^|/)dist/''',
+  '''(^|/)test-results/''',
+  '''(^|/)playwright-report/''',
+  '''(^|/)__pycache__/''',
+]

@@ -1,0 +1,71 @@
+# Overlay only on compose.restore.yml, with a fresh restore.env and guarded database.
+x-training-env: &training-env
+  APP_MODE: development
+  APP_ORIGIN: https://orgproekt-lab.localhost:8443
+  PASSKEYS_ENABLED: 'true'
+  DATABASE_URL: postgresql+psycopg://orgproekt_app:${DB_APP_PASSWORD:?}@db/orgproekt
+  BROKER_URL: amqp://orgproekt:${RABBITMQ_PASSWORD:?}@rabbitmq:5672//
+  MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?}
+  AUDIT_HMAC_KEY: ${AUDIT_HMAC_KEY:?}
+  GEMINI_ENABLED: 'false'
+  GEMINI_API_KEY: ''
+x-logs: &logs
+  driver: local
+  options: {max-size: '10m', max-file: '3', compress: 'true'}
+x-background: &background
+  image: ${RESTORE_APP_IMAGE:?}
+  environment: *training-env
+  networks: [isolated]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging: *logs
+  depends_on:
+    db: {condition: service_healthy}
+    rabbitmq: {condition: service_healthy}
+services:
+  api:
+    environment: *training-env
+  caddy:
+    # Same unprivileged UID as the certificate issuer; the server key stays mode 0600.
+    user: '10001:10001'
+    ports: !override ['127.0.0.1:8443:8443']
+    # Docker Desktop publishes host ports only when there is a non-internal ingress bridge.
+    networks:
+      isolated: {}
+      entry: {gw_priority: 1}
+    volumes:
+      - ${RESTORE_PRIVATE_DIR:?}/tls/server.pem:/run/lab/server.pem:ro
+      - ${RESTORE_PRIVATE_DIR:?}/tls/server.key:/run/lab/server.key:ro
+  rabbitmq:
+    image: rabbitmq:4-alpine@sha256:21577d148f4f7563a87d761862fa353f59348a094833ca8b1b1a46a8102dffce
+    hostname: training-rabbit
+    environment:
+      RABBITMQ_DEFAULT_USER: orgproekt
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?}
+    volumes: [training_queue:/var/lib/rabbitmq]
+    networks: [isolated]
+    logging: *logs
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 8s
+      retries: 24
+  worker:
+    <<: *background
+    command: [celery, -A, app.worker.celery, worker, --loglevel=WARNING, --concurrency=1]
+    healthcheck:
+      test: [CMD, celery, -A, app.worker.celery, inspect, ping, --timeout=5]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+  scheduler:
+    <<: *background
+    command: [celery, -A, app.worker.celery, beat, --loglevel=WARNING, --schedule=/tmp/celerybeat-schedule]
+volumes:
+  training_queue:
+networks:
+  entry:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: 'false'
+      com.docker.network.bridge.host_binding_ipv4: '127.0.0.1'

@@ -1,0 +1,43 @@
+[project]
+name = "orgproekt"
+version = "0.1.0"
+description = "Document-grounded organizational change workspace"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "fastapi==0.162.0",
+  "uvicorn[standard]>=0.38,<1",
+  "sqlalchemy==2.1.6",
+  "alembic==1.20.1",
+  "psycopg[binary]==3.3.6",
+  "celery==5.6.3",
+  "pydantic-settings==2.16.1",
+  "argon2-cffi==25.1.0",
+  "cryptography==50.0.2",
+  "pyotp==2.10.0",
+  "python-multipart==0.0.32",
+  "defusedxml==0.7.1",
+  "pypdf==6.21.4",
+  "google-genai==2.33.0",
+  "onnxruntime==1.31.1",
+  "tokenizers==0.23.3",
+  "pgvector==0.5.1",
+  "numpy==2.5.4",
+  "python-docx==1.2.0",
+  "reportlab>=4.4,<6",
+  "fido2>=2.0,<3",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.14,<1", "pip-audit>=2.9,<3"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
