@@ -31,7 +31,19 @@ Set-BackupPrivateDirectory $privatePath
 $envFile = Join-Path $privatePath 'restore.env'
 $manifest = Get-Content -LiteralPath (Join-Path $privatePath 'manifest.json') -Raw | ConvertFrom-Json
 $caddyConfig = (Invoke-BackupDocker run --rm --network none --entrypoint cat $manifest.web_image /etc/caddy/Caddyfile) -join "`n"
-if (-not $caddyConfig.Contains(':8080 {')) { throw 'Неизвестная конфигурация Caddy; автоматическая смена порта запрещена.' }
+$newSite = 'http://orgproekt.localhost:8080 {'
+if ($caddyConfig.Contains($newSite)) {
+    # Remove only the legacy localhost redirect block from the restored site.
+    $legacy = [regex]::new('(?ms)^http://localhost:8080, http://127\.0\.0\.1:8080 \{\r?\n.*?^\}\r?\n')
+    $cleaned = $legacy.Replace($caddyConfig, '', 1)
+    if ($cleaned -eq $caddyConfig) { throw 'Неизвестная конфигурация перенаправления Caddy.' }
+    $caddyConfig = $cleaned
+    $sourceListener = $newSite
+} elseif ($caddyConfig.Contains(':8080 {')) {
+    $sourceListener = ':8080 {'
+} else {
+    throw 'Неизвестная конфигурация Caddy; автоматическая смена порта запрещена.'
+}
 $listener = ':8082 {'
 if ($HttpsTraining) {
     $issuerScript = Join-Path $BackupRoot 'tools/https-lab/certificate.py'
@@ -42,15 +54,19 @@ if ($HttpsTraining) {
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $privatePath 'tls-identity.json') -Encoding ascii
     $listener = "https://orgproekt-lab.localhost:8443 {`n    tls /run/lab/server.pem /run/lab/server.key"
 }
-[IO.File]::WriteAllText((Join-Path $privatePath 'Caddyfile'), $caddyConfig.Replace(':8080 {', $listener), [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText((Join-Path $privatePath 'Caddyfile'), $caddyConfig.Replace($sourceListener, $listener), [Text.UTF8Encoding]::new($false))
 $env:RESTORE_PRIVATE_DIR = $privatePath.Replace('\','/')
 $composeArgs = @('compose','--env-file',$envFile,'-p',$project,'-f',(Join-Path $BackupRoot 'compose.restore.yml'))
 if ($HttpsTraining) { $composeArgs += @('-f',(Join-Path $BackupRoot 'compose.https-training.yml')) }
+$parserEnabled = $HttpsTraining -and (Test-ParserImage $manifest.app_image)
+if ($parserEnabled) { $composeArgs += @('-f',(Join-Path $BackupRoot 'compose.https-training-parser.yml')) }
 try {
     Invoke-BackupDocker @composeArgs up -d --wait db
     Invoke-BackupDocker run --rm --network "${project}_isolated" @limits @mounts -v "${privatePath}:/private" orgproekt-backup:local restore --archive $archiveArg --key $keyArg --sha256 $ExpectedSha256
     if ($HttpsTraining) {
+        if ($parserEnabled) { Invoke-BackupDocker @composeArgs up -d --wait --wait-timeout 120 parser }
         Invoke-BackupDocker @composeArgs up -d --wait --wait-timeout 120 api caddy worker scheduler
+        if ($parserEnabled) { [IO.File]::WriteAllText((Join-Path $privatePath 'parser-enabled'), '1') }
         Write-Output 'Учебная копия: https://orgproekt-lab.localhost:8443/. Для доверия Windows выполните restore-lab-control.ps1 -HttpsTraining -Action Trust.'
     } else {
         Invoke-BackupDocker @composeArgs up -d --wait api caddy

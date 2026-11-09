@@ -1,4 +1,4 @@
-# Обёртка для терминалов, открытых до установки Docker Desktop. PATH меняется только в процессе.
+﻿# Обёртка для терминалов, открытых до установки Docker Desktop. PATH меняется только в процессе.
 $ErrorActionPreference = 'Stop'
 $dockerDir = Join-Path $env:LOCALAPPDATA 'Programs\DockerDesktop\resources\bin'
 if (-not (Test-Path -LiteralPath (Join-Path $dockerDir 'docker.exe'))) {

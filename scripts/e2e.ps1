@@ -1,4 +1,4 @@
-param([switch]$LocalDemo)
+﻿param([switch]$LocalDemo)
 # Explicitly disposable E2E stack. Never touches the orgproekt project or its volumes.
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)

@@ -39,9 +39,11 @@ function Set-BackupPrivateDirectory([string]$Path) {
 }
 
 function Initialize-BackupTools([switch]$Rebuild) {
-    & $BackupDocker image inspect orgproekt-backup:local --format '{{.Id}}' 2>$null | Out-Null
-    if ($Rebuild -or $LASTEXITCODE -ne 0) {
-        Invoke-BackupDocker build -f (Join-Path $BackupRoot 'tools/backup/Dockerfile') -t orgproekt-backup:local $BackupRoot
+    $appImage = (Invoke-BackupDocker image inspect orgproekt-backend:local --format '{{.Id}}').Trim()
+    $labels = & $BackupDocker image inspect orgproekt-backup:local --format '{{json .Config.Labels}}' 2>$null
+    $builtFrom = if ($LASTEXITCODE -eq 0 -and $labels) { ($labels | ConvertFrom-Json).'orgproekt.base-image-id' }
+    if ($Rebuild -or $LASTEXITCODE -ne 0 -or $builtFrom -ne $appImage) {
+        Invoke-BackupDocker build --build-arg "APP_IMAGE_ID=$appImage" -f (Join-Path $BackupRoot 'tools/backup/Dockerfile') -t orgproekt-backup:local $BackupRoot
     }
 }
 
@@ -49,4 +51,9 @@ function Get-BackupContainerImage([string]$Service) {
     $id = Invoke-BackupDocker compose -p orgproekt -f (Join-Path $BackupRoot 'compose.yml') ps -q $Service
     if (-not $id) { throw "Основной сервис $Service не запущен." }
     return (Invoke-BackupDocker inspect --format '{{.Image}}' $id).Trim()
+}
+
+function Test-ParserImage([string]$Image) {
+    & $BackupDocker run --rm --network none --entrypoint /usr/bin/test $Image -f /app/app/parser_service.py 2>$null | Out-Null
+    return ($LASTEXITCODE -eq 0)
 }

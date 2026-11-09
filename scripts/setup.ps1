@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
 if (Test-Path -LiteralPath '.env') {
     Write-Output '.env уже существует: секреты сохранены, файл не изменён.'
@@ -17,7 +17,7 @@ $auditKey = New-RandomSecret
 $content = @"
 APP_MODE=development
 LOCAL_DEMO_MODE=true
-APP_ORIGIN=http://localhost:8080
+APP_ORIGIN=http://orgproekt.localhost:8080
 DISPLAY_TIMEZONE=Asia/Almaty
 DB_ADMIN_PASSWORD=$dbAdmin
 DB_APP_PASSWORD=$dbApp

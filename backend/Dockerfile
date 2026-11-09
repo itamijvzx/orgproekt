@@ -10,7 +10,7 @@ COPY backend/embedding-model.json ./
 COPY backend/scripts/fetch_embedding_model.py ./scripts/fetch_embedding_model.py
 RUN python scripts/fetch_embedding_model.py /opt/orgproekt/embeddings
 COPY backend/ ./
-RUN useradd --create-home --uid 10001 app
+RUN useradd --create-home --uid 10001 app && mkdir /app/parser-socket && chown app:app /app/parser-socket
 USER app
 ENV PATH="/app/.venv/bin:$PATH"
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--no-proxy-headers"]

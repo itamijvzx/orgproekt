@@ -51,11 +51,14 @@ if ($HttpsTraining) {
     $release = Join-Path $privatePath 'training-release.env'
     if (Test-Path -LiteralPath $release) { $composeArgs += @('--env-file',$release) }
 }
+$parserEnabled = $HttpsTraining -and (Test-Path -LiteralPath (Join-Path $privatePath 'parser-enabled'))
+if ($parserEnabled) { $composeArgs += @('-f',(Join-Path $BackupRoot 'compose.https-training-parser.yml')) }
 try {
     switch ($Action) {
         'Start' {
             $services = @('db','api','caddy')
             if ($HttpsTraining) { $services += @('rabbitmq','worker','scheduler') }
+            if ($parserEnabled) { Invoke-BackupDocker @composeArgs up -d --wait --wait-timeout 120 parser }
             Invoke-BackupDocker @composeArgs up -d --wait --wait-timeout 120 @services
         }
         'Stop' { Invoke-BackupDocker @composeArgs stop }

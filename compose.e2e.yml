@@ -1,15 +1,15 @@
 # Separate project: docker compose -p orgproekt-e2e -f compose.yml -f compose.e2e.yml ...
 services:
   api:
-    environment: { LOCAL_DEMO_MODE: "false" }
+    environment: { LOCAL_DEMO_MODE: "false", APP_ORIGIN: "http://orgproekt.localhost:8080" }
   worker:
-    environment: { LOCAL_DEMO_MODE: "false" }
+    environment: { LOCAL_DEMO_MODE: "false", APP_ORIGIN: "http://orgproekt.localhost:8080" }
   scheduler:
-    environment: { LOCAL_DEMO_MODE: "false" }
+    environment: { LOCAL_DEMO_MODE: "false", APP_ORIGIN: "http://orgproekt.localhost:8080" }
   migrate:
-    environment: { LOCAL_DEMO_MODE: "false" }
+    environment: { LOCAL_DEMO_MODE: "false", APP_ORIGIN: "http://orgproekt.localhost:8080" }
   tools:
-    environment: { LOCAL_DEMO_MODE: "false" }
+    environment: { LOCAL_DEMO_MODE: "false", APP_ORIGIN: "http://orgproekt.localhost:8080" }
     volumes: !override [./.local/e2e:/private]
   caddy:
     image: orgproekt-caddy:latest
@@ -28,6 +28,6 @@ services:
       - ./docs/screenshots:/screenshots
     environment:
       CI: "1"
-      PLAYWRIGHT_BASE_URL: http://localhost:8080
+      PLAYWRIGHT_BASE_URL: http://orgproekt.localhost:8080
     command: [npm, run, test:e2e]
     depends_on: [caddy]

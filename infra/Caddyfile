@@ -2,7 +2,11 @@
     admin off
     auto_https off
 }
-:8080 {
+http://localhost:8080, http://127.0.0.1:8080 {
+    header Set-Cookie "orgproekt_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"
+    redir http://orgproekt.localhost:8080{uri} 302
+}
+http://orgproekt.localhost:8080 {
     header {
         X-Content-Type-Options nosniff
         X-Frame-Options DENY

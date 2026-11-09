@@ -62,9 +62,17 @@ def password_valid(encoded: str, password: str) -> bool:
         return False
 
 
-def limit(db: Session, request: Request, purpose: str, limit_count: int = 15):
-    # Per-IP and per-challenge buckets, not a username-based account lockout.
-    bucket = digest(f"{purpose}:{request.client.host if request.client else 'unknown'}")
+def limit(
+    db: Session, request: Request, purpose: str, limit_count: int = 15, subject: str | None = None
+):
+    # The proxy peer is shared by every user. Public identity/token endpoints use
+    # their own opaque bucket; authenticated challenges already include session IDs.
+    scope = (
+        digest(subject.strip().lower())
+        if subject is not None
+        else (request.client.host if request.client else "unknown")
+    )
+    bucket = digest(f"{purpose}:{scope}")
     db.execute(select(func.pg_advisory_xact_lock(int(bucket[:15], 16))))
     cutoff = now() - timedelta(minutes=5)
     db.execute(delete(AuthAttempt).where(AuthAttempt.created_at < cutoff))
@@ -162,7 +170,7 @@ def begin_session(db: Session, user: UserAccount, request: Request):
 
 @router.post("/login", response_model=schemas.LoginResponse)
 def login(data: Login, request: Request, response: Response, db: Session = Depends(get_db)):
-    limit(db, request, "login")
+    limit(db, request, "login", subject=data.username)
     user = db.scalar(
         select(UserAccount).where(UserAccount.username == data.username.lower().strip())
     )
@@ -469,7 +477,7 @@ def revoke_others(row: BrowserSession = Depends(recent), db: Session = Depends(g
 
 @router.post("/reset-password", response_model=schemas.ResetResponse)
 def reset_password(data: Reset, request: Request, db: Session = Depends(get_db)):
-    limit(db, request, "recovery", 8)
+    limit(db, request, "recovery", 8, subject=data.token)
     token = db.scalar(
         select(RecoveryToken)
         .where(RecoveryToken.token_hash == digest(data.token))

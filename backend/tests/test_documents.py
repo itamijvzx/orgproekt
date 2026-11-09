@@ -1,5 +1,6 @@
 import hashlib
 import io
+import struct
 import uuid
 import zipfile
 from datetime import timedelta
@@ -73,6 +74,93 @@ def test_parser_exact_positions_and_limits():
             z.writestr(name, content)
         with pytest.raises(ExtractionError):
             extract(raw.getvalue(), "docx")
+
+
+def external_docx():
+    source = io.BytesIO(docx_bytes())
+    output = io.BytesIO()
+    with zipfile.ZipFile(source) as original, zipfile.ZipFile(output, "w") as changed:
+        for name in original.namelist():
+            content = original.read(name)
+            if name == "word/_rels/document.xml.rels":
+                content = content.replace(
+                    b"</Relationships>",
+                    b'<Relationship Id="outside" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.invalid/tracker" TargetMode="External"/></Relationships>',
+                )
+            changed.writestr(name, content)
+    return output.getvalue()
+
+
+def test_external_document_is_rejected_and_historical_original_stays_private(client, seeded):
+    with pytest.raises(ExtractionError) as failure:
+        extract(external_docx(), "docx")
+    assert failure.value.code == "active_content"
+    dept, rejected = setup_upload(client, seeded, content=external_docx())
+    document_tasks.extract_document(rejected["job_id"])
+    rejected_path = "/api/v1/documents/" + rejected["version_id"]
+    assert client.get(rejected_path).json()["job"]["error_code"] == "active_content"
+    assert client.get(rejected_path + "/file").status_code == 409
+
+    historical_response = upload(client, dept["id"])
+    assert historical_response.status_code == 202
+    historical = historical_response.json()
+    document_tasks.extract_document(historical["job_id"])
+    with SessionLocal() as db:
+        job = db.get(DocumentJob, historical["job_id"])
+        job.warnings = ["external_links_not_fetched"]
+        db.commit()
+    historical_path = "/api/v1/documents/" + historical["version_id"]
+    assert client.get(historical_path).json()["job"]["status"] == "ready"
+    assert client.get(historical_path + "/file").status_code == 409
+
+
+def test_parser_unavailable_fails_closed(monkeypatch):
+    monkeypatch.setenv("PARSER_SOCKET", "/missing/extract.sock")
+    assert document_tasks.parse_original(docx_bytes(), "docx") == {
+        "ok": False,
+        "error_code": "parser_unavailable",
+    }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"[]",
+        b'{"ok":true,"blocks":[],"status":"ready","warnings":"bad"}',
+        b'{"ok":true,"blocks":[{"kind":"paragraph","locator":"a","text":"b","structure":{"nested":"oversize"}}],"status":"ready","warnings":[],"page_count":101}',
+        b'{"ok":false,"error_code":"bad; private data"}',
+    ],
+)
+def test_untrusted_parser_response_fails_closed(monkeypatch, payload):
+    class FakeSocket:
+        def __init__(self):
+            self.data = bytearray(struct.pack("!I", len(payload)) + payload)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def settimeout(self, _):
+            pass
+
+        def connect(self, _):
+            pass
+
+        def sendall(self, _):
+            pass
+
+        def recv(self, length):
+            result = bytes(self.data[:length])
+            del self.data[:length]
+            return result
+
+    monkeypatch.setattr(document_tasks.socket, "socket", lambda *_: FakeSocket())
+    assert document_tasks.parse_original(docx_bytes(), "docx") == {
+        "ok": False,
+        "error_code": "parse_failed",
+    }
 
 
 def test_upload_extract_history_idempotency_and_scope(client, seeded):

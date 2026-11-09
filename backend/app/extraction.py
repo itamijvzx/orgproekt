@@ -112,13 +112,17 @@ def docx(data: bytes) -> Extraction:
             if name.endswith((".xml", ".rels")):
                 trees[name] = ET.fromstring(archive.read(name), forbid_dtd=True)
                 if name.endswith(".rels") and any(
-                    item.get("TargetMode") == "External" for item in trees[name]
+                    (item.get("TargetMode") or "").casefold() == "external" for item in trees[name]
                 ):
-                    warnings.add("external_links_not_fetched")
+                    raise ExtractionError("active_content")
         root = trees["word/document.xml"]
         body = root.find(W + "body")
         if body is None:
             raise ExtractionError("invalid_docx")
+        if any(
+            item.tag in {W + "instrText", W + "fldSimple", W + "fldChar"} for item in body.iter()
+        ):
+            raise ExtractionError("active_content")
         partial = any(
             name.startswith(("word/header", "word/footer", "word/footnotes", "word/endnotes"))
             for name in names
@@ -228,7 +232,15 @@ def pdf(data: bytes) -> Extraction:
                 raise ExtractionError("active_content")
             if any(
                 key in value
-                for key in ("/JS", "/JavaScript", "/Launch", "/EmbeddedFiles", "/XFA", "/RichMedia")
+                for key in (
+                    "/JS",
+                    "/JavaScript",
+                    "/Launch",
+                    "/EmbeddedFiles",
+                    "/XFA",
+                    "/RichMedia",
+                    "/URI",
+                )
             ):
                 raise ExtractionError("active_content")
             if value.get("/S") in (
@@ -237,6 +249,7 @@ def pdf(data: bytes) -> Extraction:
                 "/GoToR",
                 "/SubmitForm",
                 "/ImportData",
+                "/URI",
             ):
                 raise ExtractionError("active_content")
             for item in value.values():

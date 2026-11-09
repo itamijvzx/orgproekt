@@ -162,9 +162,15 @@ def test_rate_limit_neutral_errors_and_validation_redaction(client, seeded):
         "/api/v1/auth/login", json={"username": "hr", "password": secret, "role": "admin"}
     )
     assert invalid.status_code == 422 and secret not in invalid.text
-    for _ in range(13):
+    for _ in range(14):
         client.post("/api/v1/auth/login", json={"username": "absent", "password": "incorrect"})
     limited = client.post(
         "/api/v1/auth/login", json={"username": "absent", "password": "incorrect"}
     )
     assert limited.status_code == 429
+    # Attempts against one identity cannot lock every employee behind the proxy.
+    another = client.post(
+        "/api/v1/auth/login",
+        json={"username": "hr", "password": seeded["hr"]["password"]},
+    )
+    assert another.status_code == 200

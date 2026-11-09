@@ -1,0 +1,30 @@
+# Add only when the restored API image includes app.parser_service.
+services:
+  parser:
+    image: ${RESTORE_APP_IMAGE:?}
+    command: [python, -m, app.parser_service]
+    environment: {PYTHONDONTWRITEBYTECODE: '1'}
+    volumes: [training_parser_socket:/app/parser-socket]
+    network_mode: none
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 1152m
+    logging:
+      driver: local
+      options: {max-size: '10m', max-file: '3', compress: 'true'}
+    healthcheck:
+      test: [CMD, python, -m, app.parser_service, health]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+  worker:
+    volumes: [training_parser_socket:/app/parser-socket]
+    depends_on:
+      db: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+      parser: {condition: service_healthy}
+volumes:
+  training_parser_socket:

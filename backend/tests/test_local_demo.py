@@ -225,7 +225,12 @@ def test_demo_refuses_external_configuration(overrides):
 
 def test_secure_default_and_demo_loopback_configuration():
     assert Settings.model_fields["local_demo_mode"].default is False
-    for origin in ("http://localhost:8080", "http://127.0.0.1:8082", "http://[::1]:8080"):
+    for origin in (
+        "http://orgproekt.localhost:8080",
+        "http://localhost:8080",
+        "http://127.0.0.1:8082",
+        "http://[::1]:8080",
+    ):
         assert Settings(
             **(settings().model_dump() | {"local_demo_mode": True, "app_origin": origin})
         ).local_demo_mode

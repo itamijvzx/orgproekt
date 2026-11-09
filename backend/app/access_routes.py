@@ -193,7 +193,7 @@ def cancel_invite(
 
 @onboarding.post("/accept-invitation", response_model=Ok)
 def accept(data: s.InvitationAccept, request: Request, db: Session = Depends(get_db)):
-    auth.limit(db, request, "invitation-accept", 8)
+    auth.limit(db, request, "invitation-accept", 8, subject=data.token)
     # Same identity lock as admin commands: cancellation/blocking cannot race activation.
     from sqlalchemy import text
 

@@ -1,4 +1,4 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'backup-common.ps1')
 
 $statusDirectory = Join-Path $BackupRoot '.local\backup-operations'

@@ -13,7 +13,7 @@ x-app: &app
   environment: &app-env
     APP_MODE: ${APP_MODE:-development}
     LOCAL_DEMO_MODE: ${LOCAL_DEMO_MODE:-false}
-    APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+    APP_ORIGIN: ${APP_ORIGIN:-http://orgproekt.localhost:8080}
     DISPLAY_TIMEZONE: ${DISPLAY_TIMEZONE:-Asia/Almaty}
     DATABASE_URL: postgresql+psycopg://orgproekt_app:${DB_APP_PASSWORD:?Run scripts/setup.ps1}@db/orgproekt
     BROKER_URL: amqp://orgproekt:${RABBITMQ_PASSWORD:?Run scripts/setup.ps1}@rabbitmq:5672//
@@ -82,8 +82,37 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+  parser:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: orgproekt-backend:local
+    command: [python, -m, app.parser_service]
+    environment:
+      PYTHONDONTWRITEBYTECODE: '1'
+    volumes: [parser_socket:/app/parser-socket]
+    network_mode: none
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 1152m
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: [CMD, python, -m, app.parser_service, health]
+      interval: 10s
+      timeout: 3s
+      retries: 12
   worker:
     <<: *app
+    volumes: [parser_socket:/app/parser-socket]
+    depends_on:
+      db: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+      parser: {condition: service_healthy}
     command: [celery, -A, app.worker.celery, worker, --loglevel=WARNING, --concurrency=2]
     healthcheck:
       test: [CMD, celery, -A, app.worker.celery, inspect, ping, --timeout=5]
@@ -109,7 +138,7 @@ services:
     <<: *app
     profiles: [tools]
     restart: 'no'
-    volumes: [./.local:/private]
+    volumes: [./.local:/private, parser_socket:/app/parser-socket]
     command: [python, -m, app.cli, seed]
 
 volumes:
@@ -117,5 +146,6 @@ volumes:
   rabbit_data:
   caddy_data:
   caddy_config:
+  parser_socket:
 networks:
   internal:

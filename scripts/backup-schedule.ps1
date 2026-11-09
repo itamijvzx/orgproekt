@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet('Install', 'Update', 'Status', 'Remove')][string]$Action = 'Status',
     [ValidatePattern('^(?:[01][0-9]|2[0-3]):[0-5][0-9]$')][string]$At = '03:00',
     [ValidateRange(1, 30)][int]$DaysInterval = 1

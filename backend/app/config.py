@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="ignore")
     app_mode: str = "development"
-    app_origin: str = "http://localhost:8080"
+    app_origin: str = "http://orgproekt.localhost:8080"
     display_timezone: str = "Asia/Almaty"
     database_url: SecretStr
     broker_url: SecretStr
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
         if self.local_demo_mode and (
             self.app_mode not in {"development", "test"}
             or origin.scheme != "http"
-            or origin.hostname not in {"localhost", "127.0.0.1", "::1"}
+            or origin.hostname not in {"localhost", "orgproekt.localhost", "127.0.0.1", "::1"}
             or origin.username
             or origin.password
             or origin.path
@@ -60,6 +60,7 @@ class Settings(BaseSettings):
             raise ValueError("Production deployment is not enabled in this stage")
         if origin.scheme == "http" and origin.hostname not in {
             "localhost",
+            "orgproekt.localhost",
             "127.0.0.1",
             "testserver",
             "::1",

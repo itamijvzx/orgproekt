@@ -1,4 +1,4 @@
-param([switch]$FullApi)
+﻿param([switch]$FullApi)
 . (Join-Path $PSScriptRoot 'backup-common.ps1')
 $labs = @(Get-ChildItem -LiteralPath (Join-Path $BackupRoot '.local/https-training') -Directory -Filter 'orgproekt-restore-*')
 if ($labs.Count -ne 1) { throw 'Configure the trusted HTTPS training lab first.' }

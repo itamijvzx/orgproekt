@@ -2,8 +2,9 @@
 
 import json
 import os
-import subprocess
-import sys
+import re
+import socket
+import struct
 from datetime import timedelta
 from uuid import UUID, uuid5
 
@@ -110,34 +111,77 @@ def dispatch_documents(publish):
 
 
 def parse_original(content, file_format):
-    # Child receives no database/broker/provider credentials. Linux resource limits live in extraction.main.
+    # Parsing runs in a separate container with no network or application secrets.
+    path = os.environ.get("PARSER_SOCKET", "/app/parser-socket/extract.sock")
+    code = {"docx": b"D", "pdf": b"P"}.get(file_format)
+    if code is None or not 0 < len(content) <= 10 * 1024 * 1024:
+        return {"ok": False, "error_code": "file_limit"}
     try:
-        result = subprocess.run(
-            [sys.executable, "-m", "app.extraction", file_format],
-            input=content,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            timeout=25,
-            check=False,
-            env={
-                "PATH": os.environ.get("PATH", ""),
-                "LANG": "C.UTF-8",
-                "PYTHONDONTWRITEBYTECODE": "1",
-            },
-        )
-    except subprocess.TimeoutExpired:
-        return {"ok": False, "error_code": "timeout"}
-    if result.returncode or len(result.stdout) > 8 * 1024 * 1024:
-        return {"ok": False, "error_code": "resource_limit"}
+        with socket.socket(socket.AF_UNIX) as connection:
+            connection.settimeout(35)
+            connection.connect(path)
+            connection.sendall(code + struct.pack("!I", len(content)) + content)
+            size = struct.unpack("!I", _read_exact(connection, 4))[0]
+            if size > 8 * 1024 * 1024:
+                return {"ok": False, "error_code": "resource_limit"}
+            raw = _read_exact(connection, size)
+    except (OSError, ValueError, struct.error):
+        return {"ok": False, "error_code": "parser_unavailable"}
     try:
-        payload = json.loads(result.stdout)
-        if payload.get("ok"):
-            validate_blocks([Block(**b) for b in payload["blocks"]])
-            if payload["status"] not in {"ready", "partial", "needs_ocr"}:
+        payload = json.loads(raw)
+        if not isinstance(payload, dict) or type(payload.get("ok")) is not bool:
+            raise ValueError("Invalid parser response")
+        if payload["ok"]:
+            if not isinstance(payload.get("blocks"), list) or len(payload["blocks"]) > 2000:
+                raise ValueError("Invalid parser blocks")
+            blocks = [Block(**b) for b in payload["blocks"]]
+            validate_blocks(blocks)
+            if payload.get("status") not in {"ready", "partial", "needs_ocr"}:
                 raise ValueError("Unexpected extraction state")
+            warnings = payload.get("warnings")
+            page_count = payload.get("page_count")
+            if (
+                not isinstance(warnings, list)
+                or len(warnings) > 30
+                or any(not isinstance(w, str) or len(w) > 1000 for w in warnings)
+                or (
+                    page_count is not None
+                    and (type(page_count) is not int or not 0 <= page_count <= 100)
+                )
+            ):
+                raise ValueError("Invalid parser metadata")
+            for block in blocks:
+                if (
+                    block.kind not in {"heading", "paragraph", "list_item", "pdf_page"}
+                    or not isinstance(block.locator, str)
+                    or len(block.locator) > 120
+                    or not isinstance(block.text, str)
+                    or (
+                        block.page is not None
+                        and (type(block.page) is not int or not 1 <= block.page <= 100)
+                    )
+                    or not isinstance(block.structure, dict)
+                    or len(json.dumps(block.structure)) > 4096
+                ):
+                    raise ValueError("Invalid parser block")
+        elif not isinstance(payload.get("error_code"), str) or not re.fullmatch(
+            r"[a-z_]{1,64}", payload["error_code"]
+        ):
+            raise ValueError("Invalid parser error")
         return payload
-    except (ValueError, KeyError, TypeError, ExtractionError):
+    except (ValueError, KeyError, TypeError, ExtractionError, OverflowError, RecursionError):
         return {"ok": False, "error_code": "parse_failed"}
+
+
+def _read_exact(connection, size):
+    parts = []
+    while size:
+        part = connection.recv(size)
+        if not part:
+            raise ConnectionError("Parser response ended early")
+        parts.append(part)
+        size -= len(part)
+    return b"".join(parts)
 
 
 def extract_document(job_id):

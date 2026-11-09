@@ -46,13 +46,14 @@ MESSAGES = {
     "access_revoked": "Обработка остановлена: полномочия или сессия инициатора больше не действуют.",
 }
 ERROR_MESSAGES = {
-    "active_content": "Файл содержит макросы, встроенные файлы или активное содержимое и не поддерживается.",
+    "active_content": "Файл содержит макросы, внешние ссылки или другое активное содержимое и не поддерживается.",
     "archive_limit": "DOCX превышает допустимый размер распаковки или число частей.",
     "unsafe_archive": "DOCX содержит недопустимые пути, ссылки или зашифрованные части.",
     "encrypted_pdf": "Зашифрованный PDF не поддерживается. Предоставьте разрешённую незашифрованную копию.",
     "page_limit": "В PDF больше 100 страниц. Разделите документ на разрешённые редакции меньшего объёма.",
     "text_limit": "Извлечённый текст превышает лимит обработки.",
     "resource_limit": "Превышен лимит памяти или сложности документа.",
+    "parser_unavailable": "Изолированный обработчик документов недоступен. Повторите обработку позже.",
     "timeout": "Превышено время обработки документа.",
     "broker_unavailable": "Очередь временно недоступна. Файл сохранён; отправка будет повторена ограниченное число раз.",
     "dispatch_failed": "Не удалось передать задание в очередь. Можно повторить обработку.",
@@ -448,6 +449,10 @@ def download(
         raise HTTPException(404, "Оригинал файла не загружен")
     if job.status not in READABLE:
         raise HTTPException(409, "Оригинал доступен после проверки формата и содержимого")
+    if "external_links_not_fetched" in (job.warnings or []):
+        # Older parser versions accepted external DOCX relationships. Preserve the
+        # record and history, but never redistribute that original attachment.
+        raise HTTPException(409, "Оригинал с внешними ссылками недоступен для скачивания")
     original = db.get(DocumentOriginal, version_id)
     audit.record(
         db, "document.downloaded", row.user_id, department=doc.department_id, object_id=version_id

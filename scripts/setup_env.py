@@ -11,7 +11,7 @@ else:
     values = {
         "APP_MODE": "development",
         "LOCAL_DEMO_MODE": "true",
-        "APP_ORIGIN": "http://localhost:8080",
+        "APP_ORIGIN": "http://orgproekt.localhost:8080",
         "DISPLAY_TIMEZONE": "Asia/Almaty",
         "DB_ADMIN_PASSWORD": secrets.token_urlsafe(32),
         "DB_APP_PASSWORD": secrets.token_urlsafe(32),

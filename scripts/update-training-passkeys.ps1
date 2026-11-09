@@ -1,4 +1,4 @@
-param([switch]$Build)
+﻿param([switch]$Build)
 . (Join-Path $PSScriptRoot 'backup-common.ps1')
 $labs = @(Get-ChildItem -LiteralPath (Join-Path $BackupRoot '.local/https-training') -Directory -Filter 'orgproekt-restore-*')
 if ($labs.Count -ne 1) { throw 'Expected one HTTPS training lab.' }
@@ -16,9 +16,13 @@ $envFile = Join-Path $lab 'restore.env'
 $env:RESTORE_PRIVATE_DIR = $lab.Replace('\','/')
 $base = @('compose','--env-file',$envFile,'-p',$project,'-f',(Join-Path $BackupRoot 'compose.restore.yml'),'-f',(Join-Path $BackupRoot 'compose.https-training.yml'))
 $release = Join-Path $lab 'training-release.env'
+$parserMarker = Join-Path $lab 'parser-enabled'
+$oldParser = Test-Path -LiteralPath $parserMarker
+$newParser = Test-ParserImage $api
 $previous = if (Test-Path -LiteralPath $release) { [IO.File]::ReadAllText($release) }
 $oldArgs = $base
 if ($previous) { $oldArgs += @('--env-file',$release) }
+if ($oldParser) { $oldArgs += @('-f',(Join-Path $BackupRoot 'compose.https-training-parser.yml')) }
 $network = "${project}_isolated"
 $keyDir = Join-Path $BackupRoot '.local/backup-keys'
 $backupDir = Join-Path $lab 'upgrade-backups'
@@ -32,22 +36,34 @@ foreach ($entry in @{'demo-accounts.json'='demo-accounts.json';'workflow-account
 try {
     $oldApi = (Invoke-BackupDocker inspect --format '{{.Image}}' "${project}-api-1").Trim()
     $oldWeb = (Invoke-BackupDocker inspect --format '{{.Image}}' "${project}-caddy-1").Trim()
-    if ($previous -and $oldApi -eq $api -and $oldWeb -eq $web) {
+    if ($previous -and $oldApi -eq $api -and $oldWeb -eq $web -and $oldParser -eq $newParser) {
         Write-Output 'Selected passkey release is already installed.'
         return
     }
     try {
-        Invoke-BackupDocker @oldArgs stop caddy api scheduler worker
+        $stopServices = @('caddy','api','scheduler','worker')
+        if ($oldParser) { $stopServices += 'parser' }
+        Invoke-BackupDocker @oldArgs stop @stopServices
         Invoke-BackupDocker run @limits @sourceMounts -v "${backupDir}:/backup" -v "${keyDir}:/keys:ro" orgproekt-backup:local create --key /keys/orgproekt.agekey --app-image $oldApi --web-image $oldWeb
         $migration = Join-Path $BackupRoot 'tools/https-lab/migrate_passkeys.py'
         Invoke-BackupDocker run @limits --entrypoint python -e PYTHONPATH=/app -v "${lab}:/private:ro" -v "${migration}:/upgrade.py:ro" $api /upgrade.py
         $tempRelease = Join-Path $lab 'training-release.next'
         [IO.File]::WriteAllLines($tempRelease, [string[]]@("RESTORE_APP_IMAGE=$api","RESTORE_WEB_IMAGE=$web"), [Text.UTF8Encoding]::new($false))
         Move-Item -LiteralPath $tempRelease -Destination $release -Force
-        Invoke-BackupDocker @base --env-file $release up -d --no-build --pull never --wait --wait-timeout 120 api caddy scheduler worker
+        $newArgs = $base + @('--env-file',$release)
+        if ($newParser) {
+            $newArgs += @('-f',(Join-Path $BackupRoot 'compose.https-training-parser.yml'))
+            Invoke-BackupDocker @newArgs up -d --no-build --pull never --wait --wait-timeout 120 parser
+        }
+        Invoke-BackupDocker @newArgs up -d --no-build --pull never --wait --wait-timeout 120 api caddy scheduler worker
+        if ($newParser) { [IO.File]::WriteAllText($parserMarker, '1') }
+        elseif (Test-Path -LiteralPath $parserMarker) { Remove-Item -LiteralPath $parserMarker }
     } catch {
         if ($previous) { [IO.File]::WriteAllText($release,$previous) }
         elseif (Test-Path -LiteralPath $release) { Remove-Item -LiteralPath $release }
+        if ($oldParser) { [IO.File]::WriteAllText($parserMarker, '1') }
+        elseif (Test-Path -LiteralPath $parserMarker) { Remove-Item -LiteralPath $parserMarker }
+        if ($oldParser) { Invoke-BackupDocker @oldArgs up -d --no-build --pull never --wait --wait-timeout 120 parser }
         Invoke-BackupDocker @oldArgs up -d --no-build --pull never --wait --wait-timeout 120 api caddy scheduler worker
         throw 'Training upgrade failed. Previous images selected.'
     }

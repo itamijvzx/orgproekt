@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$PrivateDirectory)
+﻿param([Parameter(Mandatory=$true)][string]$PrivateDirectory)
 . (Join-Path $PSScriptRoot 'backup-common.ps1')
 $privatePath = Get-BackupAbsolutePath $PrivateDirectory
 $labParent = Join-Path $BackupRoot '.local/restore-labs'
