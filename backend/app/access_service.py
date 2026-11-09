@@ -197,13 +197,7 @@ def lock_actor(db, row):
     db.execute(text("SELECT pg_advisory_xact_lock(742010)"))
     db.expire_all()
     user = db.get(UserAccount, row.user_id)
-    if (
-        row.revoked
-        or row.expires_at <= now()
-        or not row.authenticated
-        or not user
-        or not user.active
-    ):
+    if not row.live or not user or not user.active:
         raise HTTPException(401, "Необходим вход")
     if not row.reauthenticated_at or now() - row.reauthenticated_at > timedelta(minutes=10):
         raise HTTPException(403, "Нужно повторное подтверждение входа")

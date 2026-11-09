@@ -35,9 +35,7 @@ def authorized(db, job, doc):
         and user.active
         and session
         and session.user_id == user.id
-        and session.authenticated
-        and not session.revoked
-        and session.expires_at > now()
+        and session.live
         and access.allowed(db, user.id, doc.department_id, "document.write")
     )
 

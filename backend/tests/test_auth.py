@@ -1,8 +1,10 @@
+import threading
 from datetime import timedelta
 
 import pyotp
 from sqlalchemy import select, update
 
+from app import auth
 from app.auth import digest
 from app.db import SessionLocal
 from app.models import BrowserSession, RecoveryToken, UserAccount, now
@@ -122,6 +124,28 @@ def test_block_expiry_and_reauthentication(client, seeded):
     )
 
 
+def test_idle_timeout_and_activity_refresh(client, seeded):
+    login(client, seeded)
+    with SessionLocal() as db:
+        db.execute(update(BrowserSession).values(last_seen_at=now() - timedelta(minutes=2)))
+        db.commit()
+    assert client.get("/api/v1/auth/me", headers={"X-OrgProekt-Background": "1"}).status_code == 200
+    with SessionLocal() as db:
+        session = db.scalar(select(BrowserSession))
+        assert session.last_seen_at < now() - timedelta(minutes=1)
+    assert client.get("/api/v1/auth/me").status_code == 200
+    with SessionLocal() as db:
+        session = db.scalar(select(BrowserSession))
+        assert session.last_seen_at > now() - timedelta(minutes=1)
+        db.execute(update(BrowserSession).values(last_seen_at=now() - timedelta(minutes=31)))
+        db.commit()
+    assert client.get("/api/v1/organization").status_code == 401
+    with SessionLocal() as db:
+        session = db.scalar(select(BrowserSession))
+        assert session.revoked
+        assert db.scalar(select(UserAccount).where(UserAccount.username == "hr")).active
+
+
 def test_mfa_recovery_replacement_retains_old_until_confirmation(client, seeded):
     credentials = login(client, seeded)
     with SessionLocal() as db:
@@ -174,3 +198,31 @@ def test_rate_limit_neutral_errors_and_validation_redaction(client, seeded):
         json={"username": "hr", "password": seeded["hr"]["password"]},
     )
     assert another.status_code == 200
+
+
+def test_distinct_login_names_share_a_global_budget(client, monkeypatch):
+    monkeypatch.setattr(auth, "LOGIN_GLOBAL_LIMIT", 3)
+    for index in range(3):
+        result = client.post(
+            "/api/v1/auth/login", json={"username": f"absent-{index}", "password": "wrong"}
+        )
+        assert result.status_code == 401
+    blocked = client.post(
+        "/api/v1/auth/login", json={"username": "another-absent", "password": "wrong"}
+    )
+    assert blocked.status_code == 429
+    assert blocked.headers["Retry-After"] == "300"
+
+
+def test_login_hashing_has_a_concurrency_guard(client, monkeypatch, seeded):
+    slots = threading.BoundedSemaphore(1)
+    slots.acquire()
+    monkeypatch.setattr(auth, "LOGIN_SLOTS", slots)
+    try:
+        blocked = client.post(
+            "/api/v1/auth/login", json={"username": "hr", "password": seeded["hr"]["password"]}
+        )
+    finally:
+        slots.release()
+    assert blocked.status_code == 429
+    assert blocked.headers["Retry-After"] == "1"

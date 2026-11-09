@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import secrets
+import threading
 import time
 from datetime import timedelta
 
@@ -22,6 +23,8 @@ router = APIRouter(prefix="/auth", tags=["Личный вход и сессии"
 hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=1)
 DUMMY_HASH = hasher.hash(secrets.token_urlsafe(32))
 COOKIE = "orgproekt_session"
+LOGIN_GLOBAL_LIMIT = 240
+LOGIN_SLOTS = threading.BoundedSemaphore(4)
 
 
 class Input(BaseModel):
@@ -63,7 +66,12 @@ def password_valid(encoded: str, password: str) -> bool:
 
 
 def limit(
-    db: Session, request: Request, purpose: str, limit_count: int = 15, subject: str | None = None
+    db: Session,
+    request: Request,
+    purpose: str,
+    limit_count: int = 15,
+    subject: str | None = None,
+    global_limit_count: int | None = None,
 ):
     # The proxy peer is shared by every user. Public identity/token endpoints use
     # their own opaque bucket; authenticated challenges already include session IDs.
@@ -72,19 +80,25 @@ def limit(
         if subject is not None
         else (request.client.host if request.client else "unknown")
     )
-    bucket = digest(f"{purpose}:{scope}")
-    db.execute(select(func.pg_advisory_xact_lock(int(bucket[:15], 16))))
+    buckets = [(digest(f"{purpose}:{scope}"), limit_count)]
+    if global_limit_count is not None:
+        buckets.append((digest(f"{purpose}:all"), global_limit_count))
+    for bucket, _ in sorted(buckets):
+        db.execute(select(func.pg_advisory_xact_lock(int(bucket[:15], 16))))
     cutoff = now() - timedelta(minutes=5)
     db.execute(delete(AuthAttempt).where(AuthAttempt.created_at < cutoff))
-    count = db.scalar(
-        select(func.count()).select_from(AuthAttempt).where(AuthAttempt.bucket == bucket)
-    )
-    if count >= limit_count:
-        db.rollback()
-        raise HTTPException(
-            429, "Слишком много попыток. Повторите через 5 минут.", headers={"Retry-After": "300"}
+    for bucket, maximum in buckets:
+        count = db.scalar(
+            select(func.count()).select_from(AuthAttempt).where(AuthAttempt.bucket == bucket)
         )
-    db.add(AuthAttempt(bucket=bucket))
+        if count >= maximum:
+            db.rollback()
+            raise HTTPException(
+                429,
+                "Слишком много попыток. Повторите через 5 минут.",
+                headers={"Retry-After": "300"},
+            )
+    db.add_all(AuthAttempt(bucket=bucket) for bucket, _ in buckets)
     db.commit()
 
 
@@ -94,10 +108,21 @@ def preauth(request: Request, db: Session = Depends(get_db)) -> BrowserSession:
     user = db.get(UserAccount, row.user_id) if row else None
     if not row or row.revoked or row.expires_at <= now() or not user or not user.active:
         raise HTTPException(401, "Необходим вход")
+    if row.authenticated and not row.live:
+        row.revoked = True
+        audit.record(db, "auth.session_idle_expired", row.user_id, category="security")
+        db.commit()
+        raise HTTPException(401, "Сеанс завершён после бездействия. Войдите заново")
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         supplied = request.headers.get("X-CSRF-Token", "")
         if not supplied or not hmac.compare_digest(supplied, row.csrf_token):
             raise HTTPException(403, "Проверка безопасности запроса не пройдена")
+    # Automatic refreshes may read protected data, but must not keep an idle
+    # browser session alive when its user has stopped interacting with the UI.
+    background = request.headers.get("X-OrgProekt-Background") == "1"
+    if row.authenticated and not background and row.last_seen_at <= now() - timedelta(minutes=1):
+        row.last_seen_at = now()
+        db.commit()
     return row
 
 
@@ -170,11 +195,18 @@ def begin_session(db: Session, user: UserAccount, request: Request):
 
 @router.post("/login", response_model=schemas.LoginResponse)
 def login(data: Login, request: Request, response: Response, db: Session = Depends(get_db)):
-    limit(db, request, "login", subject=data.username)
+    limit(db, request, "login", subject=data.username, global_limit_count=LOGIN_GLOBAL_LIMIT)
     user = db.scalar(
         select(UserAccount).where(UserAccount.username == data.username.lower().strip())
     )
-    valid = password_valid(user.password_hash if user else DUMMY_HASH, data.password)
+    if not LOGIN_SLOTS.acquire(blocking=False):
+        raise HTTPException(
+            429, "Вход временно занят. Повторите запрос.", headers={"Retry-After": "1"}
+        )
+    try:
+        valid = password_valid(user.password_hash if user else DUMMY_HASH, data.password)
+    finally:
+        LOGIN_SLOTS.release()
     if not user or not valid or not user.active:
         audit.record(db, "auth.login_failed", None, category="security")
         db.commit()
@@ -287,6 +319,7 @@ def finish_login(
     row.mfa_verified = not local_demo
     row.local_demo = local_demo
     row.expires_at = now() + timedelta(hours=settings().session_hours)
+    row.last_seen_at = now()
     row.reauthenticated_at = now()
     rotate(row, response)
     audit.record(
@@ -458,6 +491,8 @@ def sessions(row: BrowserSession = Depends(authenticated), db: Session = Depends
                     BrowserSession.local_demo.is_(True) if settings().local_demo_mode else False,
                 ),
                 BrowserSession.expires_at > now(),
+                BrowserSession.last_seen_at
+                > now() - timedelta(minutes=settings().session_idle_minutes),
             )
         )
     ]

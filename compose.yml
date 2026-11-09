@@ -10,6 +10,7 @@ x-app: &app
     context: .
     dockerfile: backend/Dockerfile
   image: orgproekt-backend:local
+  mem_limit: 2048m
   environment: &app-env
     APP_MODE: ${APP_MODE:-development}
     LOCAL_DEMO_MODE: ${LOCAL_DEMO_MODE:-false}
@@ -22,6 +23,7 @@ x-app: &app
     GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     GEMINI_MODEL: ${GEMINI_MODEL:-}
     GEMINI_ENABLED: ${GEMINI_ENABLED:-false}
+    SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-30}
   restart: unless-stopped
   logging: *logging
   security_opt: [no-new-privileges:true]
@@ -35,6 +37,7 @@ x-app: &app
 services:
   db:
     logging: *logging
+    mem_limit: 2048m
     image: pgvector/pgvector:pg17@sha256:ac08538c6f8b9904c33c8224c5e5706dbe760aca29db1d096972b4052c22a75d
     environment:
       POSTGRES_DB: orgproekt
@@ -53,6 +56,7 @@ services:
     networks: [internal]
   rabbitmq:
     logging: *logging
+    mem_limit: 768m
     image: rabbitmq:4-alpine@sha256:21577d148f4f7563a87d761862fa353f59348a094833ca8b1b1a46a8102dffce
     hostname: orgproekt-rabbit
     environment:
@@ -107,6 +111,7 @@ services:
       retries: 12
   worker:
     <<: *app
+    mem_limit: 3072m
     volumes: [parser_socket:/app/parser-socket]
     depends_on:
       db: {condition: service_healthy}
@@ -121,9 +126,11 @@ services:
       retries: 5
   scheduler:
     <<: *app
+    mem_limit: 512m
     command: [celery, -A, app.worker.celery, beat, --loglevel=WARNING, --schedule=/tmp/celerybeat-schedule]
   caddy:
     logging: *logging
+    mem_limit: 256m
     build:
       context: .
       dockerfile: frontend/Dockerfile

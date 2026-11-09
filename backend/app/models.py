@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import (
     Boolean,
@@ -103,6 +103,9 @@ class BrowserSession(Identified, Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("user_accounts.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, server_default=func.now()
+    )
     mfa_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     local_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     reauthenticated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -113,6 +116,18 @@ class BrowserSession(Identified, Base):
         from app.config import settings
 
         return self.mfa_verified or (self.local_demo and settings().local_demo_mode)
+
+    @property
+    def live(self) -> bool:
+        from app.config import settings
+
+        moment = now()
+        return bool(
+            self.authenticated
+            and not self.revoked
+            and self.expires_at > moment
+            and self.last_seen_at > moment - timedelta(minutes=settings().session_idle_minutes)
+        )
 
 
 class AuthAttempt(Identified, Base):

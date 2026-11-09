@@ -345,7 +345,7 @@ def release(
     # Export rendering cannot retain a revoked session or obsolete role grant.
     db.expire_all()
     session = db.get(BrowserSession, row.id)
-    if session.revoked or session.expires_at <= now() or not session.authenticated:
+    if not session.live:
         raise HTTPException(401, "Сессия завершена")
     for person, role in [
         (report.owner_id, "auditor"),

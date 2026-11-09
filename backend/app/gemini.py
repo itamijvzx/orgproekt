@@ -21,7 +21,6 @@ from app.models import (
     DocumentVersion,
     SourceAnchor,
     UserAccount,
-    now,
 )
 
 
@@ -62,14 +61,7 @@ def load_context(db, session_id: str, anchor_ids: list[str]) -> list[Context]:
     db.expire_all()
     session = db.get(BrowserSession, session_id)
     user = db.get(UserAccount, session.user_id) if session else None
-    if (
-        not session
-        or session.revoked
-        or session.expires_at <= now()
-        or not session.authenticated
-        or not user
-        or not user.active
-    ):
+    if not session or not session.live or not user or not user.active:
         raise ProviderError("access_revoked")
     if not anchor_ids or len(anchor_ids) > 8 or len(set(anchor_ids)) != len(anchor_ids):
         raise ProviderError("context_limit")

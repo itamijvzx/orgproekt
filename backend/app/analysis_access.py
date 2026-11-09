@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 
 from app import access, audit
 from app.analysis_models import CorpusMember, DocumentCorpus
-from app.models import BrowserSession, DocumentVersion, UserAccount, now
+from app.models import BrowserSession, DocumentVersion, UserAccount
 
 
 def version_scopes(db, ids):
@@ -37,9 +37,7 @@ def session_allowed(db, job):
         and user.active
         and session
         and session.user_id == user.id
-        and session.authenticated
-        and not session.revoked
-        and session.expires_at > now()
+        and session.live
         and permitted(db, user.id, job.version_ids, "document.write")
     )
 

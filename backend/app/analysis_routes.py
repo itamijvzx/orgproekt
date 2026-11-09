@@ -782,7 +782,7 @@ def search(
     result = search_service.search(db, query, q.strip(), mode, offset, limit)
     db.expire_all()
     user = db.get(UserAccount, row.user_id)
-    if row.revoked or not row.authenticated or row.expires_at <= now() or not user.active:
+    if not row.live or not user.active:
         raise HTTPException(401, "Необходим вход")
     if scopes != access.departments(db, row.user_id):
         raise HTTPException(404, "Область доступа изменилась. Повторите поиск.")

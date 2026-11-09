@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     gemini_model: str = ""
     gemini_enabled: bool = False
     session_hours: int = 8
+    session_idle_minutes: int = 30
     passkeys_enabled: bool = False
     local_demo_mode: bool = False
 
@@ -27,6 +28,8 @@ class Settings(BaseSettings):
     def validate_security(self):
         Fernet(self.mfa_encryption_key.get_secret_value().encode())
         ZoneInfo(self.display_timezone)
+        if self.session_hours < 1 or not 1 <= self.session_idle_minutes <= self.session_hours * 60:
+            raise ValueError("Session timeout settings are invalid")
         if len(self.audit_hmac_key.get_secret_value()) < 32:
             raise ValueError("AUDIT_HMAC_KEY must contain at least 32 random characters")
         origin = urlparse(self.app_origin)

@@ -2,6 +2,13 @@ import createClient from 'openapi-fetch'
 import type { paths } from './schema.generated'
 
 let csrf = ''
+let lastUserActivityAt = Date.now()
+const USER_ACTIVITY_WINDOW_MS = 60_000
+for (const type of ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart']) {
+  window.addEventListener(type, (event) => {
+    if (event.isTrusted && !document.hidden) lastUserActivityAt = Date.now()
+  })
+}
 export const setCsrf = (value: string) => {
   csrf = value
 }
@@ -40,6 +47,9 @@ export const client = createClient<paths>({
 client.use({
   onRequest({ request }) {
     if (!['GET', 'HEAD'].includes(request.method)) request.headers.set('X-CSRF-Token', csrf)
+    // Background polling can display fresh data but cannot extend the server session.
+    if (document.hidden || Date.now() - lastUserActivityAt > USER_ACTIVITY_WINDOW_MS)
+      request.headers.set('X-OrgProekt-Background', '1')
     return request
   },
   onResponse({ response, schemaPath }) {

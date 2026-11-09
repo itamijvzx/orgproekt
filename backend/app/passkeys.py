@@ -168,8 +168,7 @@ def require_live_owner(db, row, request):
     if (
         not user.active
         or not row.mfa_verified
-        or row.revoked
-        or row.expires_at <= now()
+        or not row.live
         or row.token_hash != auth.digest(request.cookies.get(auth.COOKIE, ""))
     ):
         raise HTTPException(401, "Необходим вход")
