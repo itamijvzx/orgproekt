@@ -84,6 +84,9 @@ class User(BaseModel):
     csrf_token: str
     session_id: str
     reauthenticated_at: datetime
+    session_expires_at: datetime
+    idle_expires_at: datetime
+    session_idle_seconds: int
     mode: str
     timezone: str
 

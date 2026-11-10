@@ -337,6 +337,45 @@ details[open] > summary {
   border-color: var(--success-border);
   color: var(--success-text);
 }
+.session-warning {
+  position: fixed;
+  z-index: 90;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(680px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid var(--warning-border);
+  border-radius: 10px;
+  background: var(--warning-surface);
+  color: var(--warning-text);
+  box-shadow: 0 16px 40px #0008;
+}
+.session-warning-copy {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.session-warning-copy strong {
+  font-size: 14px;
+}
+.session-warning [data-slot='button'] {
+  flex: none;
+}
+@media (max-width: 600px) {
+  .session-warning {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .session-warning [data-slot='button'] {
+    margin-left: 34px;
+  }
+}
 .notice-strip {
   display: flex;
   gap: 12px;

@@ -85,6 +85,9 @@ const user: User = {
   csrf_token: '',
   session_id: 'session',
   reauthenticated_at: '2026-10-29T00:00:00Z',
+  idle_expires_at: '2026-10-29T00:30:00Z',
+  session_expires_at: '2026-10-29T08:00:00Z',
+  session_idle_seconds: 1800,
   mode: 'test',
   timezone: 'Asia/Almaty',
 }

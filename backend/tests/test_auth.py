@@ -32,7 +32,10 @@ def test_password_alone_cannot_read_business_and_csrf(client, seeded):
 def test_totp_replay_single_use_recovery_and_revocation(client, seeded):
     credentials = login(client, seeded)
     original_cookie = client.cookies.get("orgproekt_session")
-    assert client.get("/api/v1/auth/me").status_code == 200
+    response = client.get("/api/v1/auth/me")
+    assert response.status_code == 200
+    assert response.json()["session_idle_seconds"] == 30 * 60
+    assert response.json()["idle_expires_at"] < response.json()["session_expires_at"]
     other = new_client()
     result = other.post(
         "/api/v1/auth/login", json={"username": "hr", "password": seeded["hr"]["password"]}

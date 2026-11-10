@@ -7171,6 +7171,11 @@
             "title": "Id",
             "type": "string"
           },
+          "idle_expires_at": {
+            "format": "date-time",
+            "title": "Idle Expires At",
+            "type": "string"
+          },
           "mode": {
             "title": "Mode",
             "type": "string"
@@ -7187,9 +7192,18 @@
             "title": "Roles",
             "type": "array"
           },
+          "session_expires_at": {
+            "format": "date-time",
+            "title": "Session Expires At",
+            "type": "string"
+          },
           "session_id": {
             "title": "Session Id",
             "type": "string"
+          },
+          "session_idle_seconds": {
+            "title": "Session Idle Seconds",
+            "type": "integer"
           },
           "timezone": {
             "title": "Timezone",
@@ -7208,6 +7222,9 @@
           "csrf_token",
           "session_id",
           "reauthenticated_at",
+          "session_expires_at",
+          "idle_expires_at",
+          "session_idle_seconds",
           "mode",
           "timezone"
         ],

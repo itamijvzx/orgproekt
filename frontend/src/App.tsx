@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/table'
 import { AuthScreen } from '@/components/AuthScreen'
 import { AccountSettings } from '@/components/AccountSettings'
+import { SessionWatch } from '@/components/SessionWatch'
 import { SourceDialog } from '@/components/SourceDialog'
 import { PersonnelDialog, type PersonnelTarget } from '@/components/PersonnelDialog'
 import { Status } from '@/components/Status'
@@ -759,12 +760,15 @@ export default function App() {
           {PRODUCT_NAME} · проверяем сессию…
         </div>
       ) : user ? (
-        <Workspace
-          user={user}
-          onLogout={() => {
-            void logout()
-          }}
-        />
+        <>
+          <Workspace
+            user={user}
+            onLogout={() => {
+              void logout()
+            }}
+          />
+          <SessionWatch key={user.session_id} user={user} onRenewed={setUser} />
+        </>
       ) : (
         <AuthScreen
           onReady={() => {

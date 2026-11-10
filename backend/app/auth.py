@@ -457,6 +457,9 @@ def me(row: BrowserSession = Depends(authenticated), db: Session = Depends(get_d
         "csrf_token": row.csrf_token,
         "session_id": row.id,
         "reauthenticated_at": row.reauthenticated_at,
+        "session_expires_at": row.expires_at,
+        "idle_expires_at": row.last_seen_at + timedelta(minutes=settings().session_idle_minutes),
+        "session_idle_seconds": settings().session_idle_minutes * 60,
         "mode": settings().app_mode,
         "timezone": settings().display_timezone,
     }

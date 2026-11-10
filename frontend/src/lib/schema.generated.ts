@@ -4363,6 +4363,11 @@ export interface components {
             display_name: string;
             /** Id */
             id: string;
+            /**
+             * Idle Expires At
+             * Format: date-time
+             */
+            idle_expires_at: string;
             /** Mode */
             mode: string;
             /**
@@ -4372,8 +4377,15 @@ export interface components {
             reauthenticated_at: string;
             /** Roles */
             roles: components["schemas"]["Grant"][];
+            /**
+             * Session Expires At
+             * Format: date-time
+             */
+            session_expires_at: string;
             /** Session Id */
             session_id: string;
+            /** Session Idle Seconds */
+            session_idle_seconds: number;
             /** Timezone */
             timezone: string;
             /** Username */
