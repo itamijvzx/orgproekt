@@ -19,7 +19,8 @@ jobs:
           node scripts/check-publication.mjs
           docker run --rm -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f dir /repo --config /repo/.gitleaks.toml --redact --no-banner
       - name: Create ephemeral environment
-        run: docker run --rm -v "$PWD:/repo" -w /repo python:3.13-slim@sha256:b3575dcf816cdacc5292df77a6e3e59b8941631078373a045efa2ac1e9c5c3b2 python scripts/setup_env.py
+        # Keep .env private (0600), but owned by the runner that invokes Compose.
+        run: docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" -w /repo python:3.13-slim@sha256:b3575dcf816cdacc5292df77a6e3e59b8941631078373a045efa2ac1e9c5c3b2 python scripts/setup_env.py
       - name: Frontend lock, typecheck, build, behavior and dependency audit
         run: docker run --rm -v "$PWD/frontend:/app" -w /app node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 sh -c 'npm ci && npm run build && npm test && npm audit --audit-level=high'
       - name: Backend build and checks

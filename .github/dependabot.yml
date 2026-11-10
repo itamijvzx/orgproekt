@@ -1,0 +1,59 @@
+version: 2
+
+# Weekly proposals only; merging remains a manual decision after CI and review.
+# Each ecosystem has at most one open version-update PR. Security PRs have a
+# separate GitHub limit and are not delayed by this weekly schedule.
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /frontend
+      - /tools/contracts
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 1
+    groups:
+      npm-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 1
+    groups:
+      python-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /frontend
+      - /tools/backup
+      - /tools/report-qa
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 1
+    # These images are built from this repository, not pulled from a registry.
+    ignore:
+      - dependency-name: orgproekt-*
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 1
+    ignore:
+      - dependency-name: orgproekt-*
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 1
