@@ -13,6 +13,8 @@ services:
     volumes: !override [./.local/e2e:/private]
   caddy:
     image: orgproekt-caddy:latest
+    # Node's API client also needs loopback resolution on isolated Docker networks.
+    extra_hosts: [orgproekt.localhost:127.0.0.1]
     ports: !override [127.0.0.1:8081:8080]
   e2e:
     logging:

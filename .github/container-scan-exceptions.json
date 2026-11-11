@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "exceptions": [
+    {
+      "images": ["backend", "backup"],
+      "target": "Python",
+      "package": "msgpack",
+      "installed": "1.1.2",
+      "ids": ["CVE-2026-114613", "GHSA-6v7p-g79w-8964"],
+      "sbom_only": true,
+      "expires": "2026-12-11",
+      "reason": "Third-party build SBOM; installed METADATA and uv.lock contain msgpack 1.2.4. Gate refuses this exception if any actual 1.1.2 installation appears; pip-audit also checks the live environment.",
+      "source": "https://trivy.dev/docs/v0.76/guide/scanner/vulnerability/"
+    },
+    {
+      "images": ["backend", "backup"],
+      "target": "Python",
+      "package": "urllib3",
+      "installed": "2.7.0",
+      "ids": ["CVE-2026-97687", "CVE-2026-97689"],
+      "sbom_only": true,
+      "expires": "2026-12-11",
+      "reason": "Third-party build SBOM; installed METADATA and uv.lock contain urllib3 2.8.0. No exception for an actual installation of 2.7.0.",
+      "source": "https://trivy.dev/docs/v0.76/guide/scanner/vulnerability/"
+    },
+    {
+      "images": ["backend", "backup"],
+      "target": "Python",
+      "package": "setuptools",
+      "installed": "70.3.0",
+      "ids": ["CVE-2025-47273"],
+      "sbom_only": true,
+      "expires": "2026-12-11",
+      "reason": "Third-party build SBOM; setuptools is not installed in the runtime environment. No exception for a real METADATA entry.",
+      "source": "https://trivy.dev/docs/v0.76/guide/scanner/vulnerability/"
+    }
+  ]
+}

@@ -4342,6 +4342,11 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** TotpCode */
+        TotpCode: {
+            /** Code */
+            code: string;
+        };
         /** UploadResult */
         UploadResult: {
             /** Document Id */
@@ -7137,7 +7142,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Code"];
+                "application/json": components["schemas"]["TotpCode"];
             };
         };
         responses: {
@@ -7502,7 +7507,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Code"];
+                "application/json": components["schemas"]["TotpCode"];
             };
         };
         responses: {

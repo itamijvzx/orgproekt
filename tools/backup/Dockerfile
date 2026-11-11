@@ -1,4 +1,5 @@
-FROM orgproekt-backend:local
+ARG APP_BASE=orgproekt-backend:local
+FROM ${APP_BASE}
 ARG APP_IMAGE_ID=unknown
 LABEL orgproekt.base-image-id="${APP_IMAGE_ID}"
 USER root

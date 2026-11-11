@@ -24,6 +24,8 @@ hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=1)
 DUMMY_HASH = hasher.hash(secrets.token_urlsafe(32))
 COOKIE = "orgproekt_session"
 LOGIN_GLOBAL_LIMIT = 240
+# Per endpoint and five-minute window, across all client-chosen token values.
+PUBLIC_TOKEN_GLOBAL_LIMIT = 60
 LOGIN_SLOTS = threading.BoundedSemaphore(4)
 
 
@@ -37,12 +39,16 @@ class Login(Input):
 
 
 class Code(Input):
-    code: str = Field(min_length=6, max_length=64)
+    code: str = Field(pattern=r"^(?:[0-9]{6}|[0-9a-f]{24})$")
+
+
+class TotpCode(Input):
+    code: str = Field(pattern=r"^[0-9]{6}$")
 
 
 class Reauth(Input):
     password: str = Field(min_length=1, max_length=1024)
-    code: str = Field(default="", max_length=64)
+    code: str = Field(default="", pattern=r"^(?:[0-9]{6}|[0-9a-f]{24})?$")
 
 
 class Reset(Input):
@@ -115,7 +121,11 @@ def preauth(request: Request, db: Session = Depends(get_db)) -> BrowserSession:
         raise HTTPException(401, "Сеанс завершён после бездействия. Войдите заново")
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         supplied = request.headers.get("X-CSRF-Token", "")
-        if not supplied or not hmac.compare_digest(supplied, row.csrf_token):
+        if (
+            not supplied
+            or not supplied.isascii()
+            or not hmac.compare_digest(supplied, row.csrf_token)
+        ):
             raise HTTPException(403, "Проверка безопасности запроса не пройдена")
     # Automatic refreshes may read protected data, but must not keep an idle
     # browser session alive when its user has stopped interacting with the UI.
@@ -158,7 +168,7 @@ def rotate(row: BrowserSession, response: Response):
 
 
 def validate_factor(user: UserAccount, code: str, allow_recovery: bool = True) -> bool:
-    if not user.mfa_secret:
+    if not user.mfa_secret or not code.isascii():
         return False
     secret = cipher().decrypt(user.mfa_secret.encode()).decode()
     totp = pyotp.TOTP(secret)
@@ -278,7 +288,7 @@ def enroll(row: BrowserSession = Depends(preauth), db: Session = Depends(get_db)
     "/mfa/confirm", response_model=schemas.RecoveryCodes, dependencies=[Depends(require_mfa_mode)]
 )
 def confirm(
-    data: Code,
+    data: TotpCode,
     request: Request,
     response: Response,
     row: BrowserSession = Depends(preauth),
@@ -406,7 +416,7 @@ def replace_mfa(
     dependencies=[Depends(require_mfa_mode)],
 )
 def confirm_mfa_replacement(
-    data: Code,
+    data: TotpCode,
     request: Request,
     response: Response,
     row: BrowserSession = Depends(recent),
@@ -515,7 +525,14 @@ def revoke_others(row: BrowserSession = Depends(recent), db: Session = Depends(g
 
 @router.post("/reset-password", response_model=schemas.ResetResponse)
 def reset_password(data: Reset, request: Request, db: Session = Depends(get_db)):
-    limit(db, request, "recovery", 8, subject=data.token)
+    limit(
+        db,
+        request,
+        "recovery",
+        8,
+        subject=data.token,
+        global_limit_count=PUBLIC_TOKEN_GLOBAL_LIMIT,
+    )
     token = db.scalar(
         select(RecoveryToken)
         .where(RecoveryToken.token_hash == digest(data.token))

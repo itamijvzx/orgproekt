@@ -1694,8 +1694,7 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "maxLength": 64,
-            "minLength": 6,
+            "pattern": "^(?:[0-9]{6}|[0-9a-f]{24})$",
             "title": "Code",
             "type": "string"
           }
@@ -5626,7 +5625,7 @@
         "properties": {
           "code": {
             "default": "",
-            "maxLength": 64,
+            "pattern": "^(?:[0-9]{6}|[0-9a-f]{24})?$",
             "title": "Code",
             "type": "string"
           },
@@ -7122,6 +7121,21 @@
           "kind"
         ],
         "title": "TextContext",
+        "type": "object"
+      },
+      "TotpCode": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "pattern": "^[0-9]{6}$",
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "TotpCode",
         "type": "object"
       },
       "UploadResult": {
@@ -10649,7 +10663,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Code"
+                "$ref": "#/components/schemas/TotpCode"
               }
             }
           },
@@ -11062,7 +11076,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Code"
+                "$ref": "#/components/schemas/TotpCode"
               }
             }
           },

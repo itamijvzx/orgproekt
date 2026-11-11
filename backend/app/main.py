@@ -46,6 +46,7 @@ from app.models import (
     UserAccount,
     now,
 )
+from app.request_validation import validate_request_text
 
 app = FastAPI(
     title="OrgProekt",
@@ -54,6 +55,7 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     redoc_url=None,
     responses=ERROR_RESPONSES,
+    dependencies=[Depends(validate_request_text)],
 )
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(passkeys.router, prefix="/api/v1")

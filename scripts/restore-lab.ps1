@@ -61,7 +61,7 @@ if ($HttpsTraining) { $composeArgs += @('-f',(Join-Path $BackupRoot 'compose.htt
 $parserEnabled = $HttpsTraining -and (Test-ParserImage $manifest.app_image)
 if ($parserEnabled) { $composeArgs += @('-f',(Join-Path $BackupRoot 'compose.https-training-parser.yml')) }
 try {
-    Invoke-BackupDocker @composeArgs up -d --wait db
+    Invoke-BackupDocker @composeArgs up -d --build --wait db
     Invoke-BackupDocker run --rm --network "${project}_isolated" @limits @mounts -v "${privatePath}:/private" orgproekt-backup:local restore --archive $archiveArg --key $keyArg --sha256 $ExpectedSha256
     if ($HttpsTraining) {
         if ($parserEnabled) { Invoke-BackupDocker @composeArgs up -d --wait --wait-timeout 120 parser }

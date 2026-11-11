@@ -1,4 +1,4 @@
-﻿param([switch]$FullApi)
+param([switch]$FullApi)
 . (Join-Path $PSScriptRoot 'backup-common.ps1')
 $labs = @(Get-ChildItem -LiteralPath (Join-Path $BackupRoot '.local/https-training') -Directory -Filter 'orgproekt-restore-*')
 if ($labs.Count -ne 1) { throw 'Configure the trusted HTTPS training lab first.' }
@@ -16,7 +16,7 @@ try {
     if (-not $caddy.Contains('https://orgproekt-lab.localhost:8443 {')) {throw 'Unexpected training origin'}
     [IO.File]::WriteAllText((Join-Path $qa 'Caddyfile'), $caddy.Replace('orgproekt-lab.localhost:8443','orgproekt-lab.localhost:8444'))
     $setup = Join-Path $PSScriptRoot 'setup_env.py'
-    Invoke-BackupDocker run --rm --network none -v "${qa}:/fixture" -v "${setup}:/fixture/scripts/setup_env.py:ro" python:3.13-slim@sha256:b3575dcf816cdacc5292df77a6e3e59b8941631078373a045efa2ac1e9c5c3b2 python /fixture/scripts/setup_env.py
+    Invoke-BackupDocker run --rm --network none -v "${qa}:/fixture" -v "${setup}:/fixture/scripts/setup_env.py:ro" python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 python /fixture/scripts/setup_env.py
     Invoke-BackupDocker @files up -d --no-build --pull never --wait --wait-timeout 120 api caddy
     $pytest = @('pytest', '-q', '--tb=short', '-p', 'no:cacheprovider')
     if (-not $FullApi) {
