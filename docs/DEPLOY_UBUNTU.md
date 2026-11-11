@@ -8,21 +8,22 @@
 
 Установить Docker Engine и Compose plugin по [официальной инструкции Docker для Ubuntu](https://docs.docker.com/engine/install/ubuntu/); не использовать случайный install-скрипт. Доступ к Docker daemon эквивалентен широким полномочиям на хосте. Не публиковать 5432/5672/15672; внутреннее имя сети Compose не означает запрет исходящего трафика.
 
-Команды ниже — **Bash на VM**, из копии репозитория. GitHub пока не содержит коммитов: сначала нужен отдельно разрешённый commit/push либо защищённая передача проверенного дерева исходников без `.env`, `.local`, node_modules и volumes.
+Команды ниже — **Bash на VM**, для новой учебной установки из [репозитория](https://github.com/itamijvzx/orgproekt). Для воспроизводимого запуска выбирайте тег выпуска; доступ к закрытому репозиторию предоставляет владелец. Не переносите `.env`, `.local`, node_modules или volumes вместе с исходниками. Эти команды пока не прошли отдельную приёмку на VM.
 
 ```bash
 docker version
 docker compose version
 cd ~/OrgProekt
-docker run --rm -v "$PWD:/repo" -w /repo python:3.13-slim@sha256:b3575dcf816cdacc5292df77a6e3e59b8941631078373a045efa2ac1e9c5c3b2 python scripts/setup_env.py
-sudo chown "$USER:$(id -gn)" .env
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" -w /repo python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 python scripts/setup_env.py
 chmod 600 .env
 mkdir -p .local
 sudo chown 10001:10001 .local
 sudo chmod 700 .local
-docker compose up -d --build
+docker compose up -d --build --wait
 docker compose --profile tools run --rm tools python -m app.cli seed
-curl --fail http://localhost:8080/api/health
+docker compose --profile tools run --rm tools python -m app.cli expand-demo
+docker compose --profile tools run --rm tools python -m app.cli workflow-demo
+curl --fail http://orgproekt.localhost:8080/api/health
 docker compose ps
 ```
 
@@ -30,16 +31,18 @@ docker compose ps
 
 ## Просмотр с Windows через SSH
 
-Пока нет TLS-конфигурации, доступ к тестовому loopback возможен через SSH-туннель. Сначала остановить локальный стенд, занимающий порт 8080. В **PowerShell на ноутбуке**, заменив имя пользователя и адрес VM:
+Для личной проверки вымышленных данных loopback можно открыть через SSH-туннель. Это ручное расширение доступа владельцем, не способ размещения учебного режима для других пользователей. Порт 8080 на ноутбуке должен быть свободен; действующую установку останавливают только по решению владельца. В **PowerShell на ноутбуке**, заменив имя пользователя и адрес VM:
 
 ```powershell
 ssh -N -L 8080:127.0.0.1:8080 your-user@your-vm
 ```
 
-Открыть `http://localhost:8080`; оставить `APP_ORIGIN=http://localhost:8080`. SSH защищает участок ноутбук–VM, но внутренние PostgreSQL/RabbitMQ соединения текущего Compose ещё без TLS. Поэтому этот вариант остаётся синтетическим стендом.
+Открыть `http://orgproekt.localhost:8080`; оставить `APP_ORIGIN=http://orgproekt.localhost:8080`. SSH защищает участок ноутбук–VM, но внутренние PostgreSQL/RabbitMQ соединения текущего Compose ещё без TLS. Отдельная локальная HTTPS-копия для Windows уже реализована, однако она не заменяет подготовку серверного размещения. Этот вариант остаётся личным синтетическим стендом.
 
 ## До производственного использования
 
-Нужно реализовать и проверить: отдельный production Compose; HTTPS Caddy с доверенным CA и Secure cookies; TLS PostgreSQL и AMQPS с проверкой имени/CA; хранение секретов вне общих env-дампов; шифрование данных и резервных копий; восстановление в изолированную среду; полноценные приглашения/назначение прав/разделение полномочий; наблюдаемость и процедура обновления. Проверить firewall с учётом правил Docker — публикация порта может обходить обычные ожидания от UFW.
+Нужно реализовать и проверить на целевом сервере: отдельный production Compose; HTTPS Caddy с доверенным CA и Secure cookies; TLS PostgreSQL и AMQPS с проверкой имени/CA; хранение секретов; шифрование диска; наблюдаемость, обновление и аварийное восстановление. Проверить firewall с учётом правил Docker — публикация порта может обходить обычные ожидания от UFW.
+
+Приглашения, согласование/отзыв прав и зашифрованный backup с изолированным восстановлением уже реализованы и проверены на Windows. Их наличие не подтверждает готовность конкретной VM: процедуру переноса, права операторов, хранение ключей и восстановление на целевом хосте ещё нужно испытать. См. [миграцию](MIGRATION_WINDOWS_TO_UBUNTU.md) и [проверенное восстановление Windows](BACKUP_RESTORE_WINDOWS.md).
 
 После реализации: тест с ноутбука по HTTPS, отсутствие внешних DB/AMQP-портов, запрет plaintext, проверка прав после отзыва, реальный restore drill, измерение задержек и диска. Эти пункты сейчас **не выполнены** и не скрыты за успешным локальным запуском.
