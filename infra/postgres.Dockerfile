@@ -6,5 +6,10 @@ ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOBIN=/out
 RUN go install -ldflags='-X main.Version=1.19' github.com/tianon/gosu@6456aaa0f3c854d199d0f037f068eb97515b7513
 
 FROM pgvector/pgvector:pg17@sha256:7d0a41464797aeb9862dfdc0bbf1526b82cfd324cdd8036df19e3545f4a9ccb8
-RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
+# GPG is only needed to prepare the upstream package repository. PostgreSQL does
+# not use its SQLite dependency (CVE-2025-7458). Keep gpgv for APT signature checks;
+# remove packages through APT so required server libraries cannot be orphaned.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && apt-get purge -y --auto-remove gpg libsqlite3-0 \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=gosu /out/gosu /usr/local/bin/gosu

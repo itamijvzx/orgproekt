@@ -27,6 +27,7 @@ jobs:
       - name: Backend build and checks
         run: |
           docker compose -f compose.yml -f compose.test.yml --profile tests build api db tests
+          docker run --rm --network none --entrypoint sh -v "$PWD:/repo:ro" orgproekt-postgres:local /repo/scripts/check_postgres_image.sh
           docker compose -f compose.yml -f compose.test.yml --profile tests run --rm tests ruff check --no-cache app tests migrations scripts ops
           docker compose -f compose.yml -f compose.test.yml --profile tests run --rm tests ruff format --no-cache --check app tests migrations scripts ops
           docker compose -f compose.yml -f compose.test.yml --profile tests run --rm tests
