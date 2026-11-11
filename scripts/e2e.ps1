@@ -5,7 +5,7 @@ Set-Location (Split-Path $PSScriptRoot -Parent)
 $projectRoot = (Get-Location).Path
 $composeFiles = @('-f','compose.yml','-f','compose.e2e.yml')
 if ($LocalDemo) { $composeFiles += @('-f','compose.demo-e2e.yml') }
-$specs = @('e2e/access.spec.ts','e2e/changes.spec.ts','e2e/reports.spec.ts','e2e/workflow.spec.ts')
+$specs = @('e2e/access.spec.ts','e2e/changes.spec.ts','e2e/reports.spec.ts','e2e/workflow.spec.ts','e2e/security.spec.ts')
 if ($LocalDemo) { $specs += 'e2e/local-demo.spec.ts' }
 $testPrivate = [IO.Path]::GetFullPath((Join-Path $projectRoot '.local\e2e'))
 if (-not $testPrivate.StartsWith($projectRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
@@ -18,6 +18,8 @@ foreach ($name in @('demo-accounts.json','test-factors.json')) {
     $target = Join-Path $testPrivate $name
     if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target }
 }
+& "$PSScriptRoot/docker.ps1" compose -p orgproekt-e2e @composeFiles --profile tools build tools
+if ($LASTEXITCODE -ne 0) { throw 'Не удалось собрать отдельный образ тестовых инструментов' }
 & "$PSScriptRoot/docker.ps1" compose -p orgproekt-e2e @composeFiles up -d --build api worker scheduler caddy
 if ($LASTEXITCODE -ne 0) { throw 'Не удалось запустить тестовый стек' }
 & "$PSScriptRoot/docker.ps1" compose -p orgproekt-e2e @composeFiles --profile tools run --rm tools python -m app.cli seed

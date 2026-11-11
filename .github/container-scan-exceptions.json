@@ -9,7 +9,7 @@
       "ids": ["CVE-2026-114613", "GHSA-6v7p-g79w-8964"],
       "sbom_only": true,
       "expires": "2026-12-11",
-      "reason": "Third-party build SBOM; installed METADATA and uv.lock contain msgpack 1.2.4. Gate refuses this exception if any actual 1.1.2 installation appears; pip-audit also checks the live environment.",
+      "reason": "Third-party build SBOM; msgpack is not installed in the runtime image. The test environment uses locked 1.2.4. Gate refuses this exception if any actual 1.1.2 METADATA appears.",
       "source": "https://trivy.dev/docs/v0.76/guide/scanner/vulnerability/"
     },
     {

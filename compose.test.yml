@@ -7,7 +7,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    image: orgproekt-backend:local
+      target: test
+    image: orgproekt-backend-test:local
     profiles: [tests]
     environment:
       TEST_ADMIN_URL: postgresql+psycopg://orgproekt_owner:${DB_ADMIN_PASSWORD}@db/orgproekt

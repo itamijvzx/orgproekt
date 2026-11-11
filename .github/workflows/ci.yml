@@ -26,18 +26,21 @@ jobs:
         run: docker run --rm -v "$PWD/frontend:/app" -w /app node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 sh -c 'npm ci && npm run build && npm test && npm audit --audit-level=high'
       - name: Backend build and checks
         run: |
-          docker compose build api db
+          docker compose -f compose.yml -f compose.test.yml --profile tests build api db tests
           docker compose -f compose.yml -f compose.test.yml --profile tests run --rm tests ruff check --no-cache app tests migrations scripts ops
           docker compose -f compose.yml -f compose.test.yml --profile tests run --rm tests ruff format --no-cache --check app tests migrations scripts ops
           docker compose -f compose.yml -f compose.test.yml --profile tests run --rm tests
-          docker run --rm orgproekt-backend:local pip-audit --progress-spinner off
+          docker run --rm orgproekt-backend-test:local pip-audit --progress-spinner off
+          docker run --rm --network none -v "$PWD:/repo:ro" orgproekt-backend:local python /repo/scripts/check_runtime_image.py
           docker run --rm --network none -v "$PWD:/repo:ro" orgproekt-backend:local python /repo/scripts/verify_public_fixtures.py
-          docker run --rm --network none -v "$PWD:/repo:ro" -w /repo/backend orgproekt-backend:local ruff check --config pyproject.toml --no-cache ../scripts/verify_public_fixtures.py
-          docker run --rm --network none -v "$PWD:/repo:ro" -w /repo/backend orgproekt-backend:local ruff format --check --no-cache ../scripts/verify_public_fixtures.py
+          docker run --rm --network none -v "$PWD:/repo:ro" -w /repo/backend orgproekt-backend-test:local ruff check --config pyproject.toml --no-cache ../scripts/verify_public_fixtures.py ../scripts/check_runtime_image.py
+          docker run --rm --network none -v "$PWD:/repo:ro" -w /repo/backend orgproekt-backend-test:local ruff format --check --no-cache ../scripts/verify_public_fixtures.py ../scripts/check_runtime_image.py
       - name: Backup encryption and restore guard failure tests
         run: |
           docker build -f tools/backup/Dockerfile -t orgproekt-backup:local .
-          docker run --rm --network none --entrypoint python -v "$PWD/backend:/src:ro" -w /src orgproekt-backup:local -m pytest --noconftest -p no:cacheprovider -q tests/test_backup.py
+          docker run --rm --network none --entrypoint python -v "$PWD:/repo:ro" orgproekt-backup:local /repo/scripts/check_runtime_image.py
+          docker build -f tools/backup/Dockerfile --target test -t orgproekt-backup-test:local .
+          docker run --rm --network none --entrypoint python -v "$PWD/backend:/src:ro" -w /src orgproekt-backup-test:local -m pytest --noconftest -p no:cacheprovider -q tests/test_backup.py
       - name: Verify generated API contracts
         run: |
           docker run --rm -v "$PWD:/repo" -w /repo/backend orgproekt-backend:local python scripts/export_openapi.py --output ../frontend/openapi.json --check

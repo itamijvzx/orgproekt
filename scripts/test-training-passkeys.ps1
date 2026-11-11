@@ -17,6 +17,7 @@ try {
     [IO.File]::WriteAllText((Join-Path $qa 'Caddyfile'), $caddy.Replace('orgproekt-lab.localhost:8443','orgproekt-lab.localhost:8444'))
     $setup = Join-Path $PSScriptRoot 'setup_env.py'
     Invoke-BackupDocker run --rm --network none -v "${qa}:/fixture" -v "${setup}:/fixture/scripts/setup_env.py:ro" python:3.13-slim@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 python /fixture/scripts/setup_env.py
+    Invoke-BackupDocker @files --profile tests build tests
     Invoke-BackupDocker @files up -d --no-build --pull never --wait --wait-timeout 120 api caddy
     $pytest = @('pytest', '-q', '--tb=short', '-p', 'no:cacheprovider')
     if (-not $FullApi) {

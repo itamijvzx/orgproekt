@@ -9,6 +9,8 @@ services:
   migrate:
     environment: { LOCAL_DEMO_MODE: "false", APP_ORIGIN: "http://orgproekt.localhost:8080" }
   tools:
+    build: {context: ., dockerfile: backend/Dockerfile, target: test}
+    image: orgproekt-backend-test:local
     environment: { LOCAL_DEMO_MODE: "false", APP_ORIGIN: "http://orgproekt.localhost:8080" }
     volumes: !override [./.local/e2e:/private]
   caddy:

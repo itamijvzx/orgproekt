@@ -11,8 +11,6 @@ services:
   tools:
     image: orgproekt-training-api:local
     volumes: !override ['${PASSKEY_QA_DIR:?}/accounts:/private']
-  tests:
-    image: orgproekt-training-api:local
   caddy:
     image: orgproekt-training-web:local
     user: '10001:10001'

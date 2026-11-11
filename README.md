@@ -146,7 +146,7 @@ $preservationScripts = Join-Path (Get-Location).Path 'backend/scripts'
 Состав файлов перед публикацией проверяется командой `node scripts/check-publication.mjs` при установленном Node.js 20 или новее. Она учитывает также принудительно добавленные в Git файлы. Порядок проверки содержимого через Gitleaks и результаты чистого запуска приведены в [проверке публикации](docs/PUBLICATION_CHECK.md).
 
 ```powershell
-./scripts/docker.ps1 compose -f compose.yml -f compose.test.yml --profile tests run --rm tests
+./scripts/docker.ps1 compose -f compose.yml -f compose.test.yml --profile tests run --build --rm tests
 ./scripts/e2e.ps1
 ./scripts/docker.ps1 compose --profile tools run --rm tools python -m app.cli verify-audit
 ```
@@ -154,6 +154,8 @@ $preservationScripts = Join-Path (Get-Location).Path 'backend/scripts'
 Первая команда создаёт и удаляет только временную PostgreSQL-базу `orgproekt_test_*`. E2E пересоздаёт **только отдельный проект `orgproekt-e2e`**, завершает его после прогона и сохраняет снимки в `docs/screenshots/`. CI повторяет установку по lock, lint, сборку, тесты, Gitleaks, аудиты зависимостей и сканирование пяти готовых контейнеров; реальный Gemini key не нужен. Успех CI подтверждается зелёным результатом конкретного запуска во вкладке **Actions** на GitHub.
 
 Проверка контейнеров блокирует HIGH/CRITICAL с доступным исправлением; находки без исправления поставщика остаются видны в отчёте. Точные временные исключения для сведений о сборке библиотек имеют срок действия и не разрешают установку старых runtime-версий. [Правила, результаты и оставшиеся ограничения](docs/SECURITY_FIXES_2026-11-11.md).
+
+Рабочие контейнеры собираются без pytest, Ruff, pip-audit, uv и тестовых исходников. Инструменты доступны в отдельных образах только для проверок; обычные команды запуска и резервного копирования сохранены. [Состав образов, размеры и проверка разделения](docs/CONTAINER_IMAGES.md).
 
 **Обновления и безопасность на GitHub.** [Dependabot](.github/dependabot.yml) проверяет библиотеки npm и Python/uv, образы Docker/Compose и GitHub Actions по понедельникам. Для каждой из пяти групп настроек допускается один открытый Pull Request с обычным обновлением; исправления известных уязвимостей обрабатываются отдельно. Обновления не применяются к основной версии автоматически: сначала проверьте изменения и результат CI, затем примите решение о слиянии. Версии образов, записанные внутри команд `run` и PowerShell-скриптов, нужно дополнительно обновлять вручную — конфигурация Dependabot не покрывает их все.
 
